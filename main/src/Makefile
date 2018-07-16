@@ -76,7 +76,7 @@ endif
 
 $(EXE) : gw.o libgw.a $(GWLIBS) $(PWOBJS) $(LRMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ $< libgw.a $(GWLIBS) \
-		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
+		 $(LRMODS) $(PWOBJS) $(QEMODS) $(LIBOBJS) $(QELIBS)
 	- ( mkdir -p ../bin ; ln -fs ../src/$(EXE) ../bin/$(EXE) )
 
 libgw.a : $(GWOBJS)
