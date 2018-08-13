@@ -52,7 +52,7 @@ SUBROUTINE sigma_matel(ik0, grid, freq)
   USE sigma_grid_module,    ONLY : sigma_grid_type
   USE timing_module,        ONLY : time_matel
   USE units_gw,             ONLY : iunsigma, iuwfc, lrwfc, lrsigma, lrsex, iunsex
-  USE wavefunctions_module, ONLY : evc
+  USE wavefunctions,        ONLY : evc
   USE wvfct,                ONLY : nbnd, npw, npwx, g2kin
 
 IMPLICIT NONE

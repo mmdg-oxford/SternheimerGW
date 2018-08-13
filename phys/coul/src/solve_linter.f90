@@ -79,7 +79,7 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
   USE units_gw,             ONLY : iubar, lrbar, iuwfc, lrwfc
   USE uspp,                 ONLY : vkb
   USE uspp_param,           ONLY : nhm
-  USE wavefunctions_module, ONLY : evc
+  USE wavefunctions,        ONLY : evc
   USE wvfct,                ONLY : nbnd, npw, npwx, et, current_k, wg
 
   IMPLICIT NONE

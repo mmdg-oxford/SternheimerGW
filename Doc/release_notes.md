@@ -1,6 +1,11 @@
 Release notes
 =============
 
+on develop
+----------
+
+> compatible QE commit 5d111a0
+
 Version 0.15
 ------------
 

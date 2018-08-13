@@ -40,7 +40,7 @@ subroutine allocate_gwq
   USE qpoint,                ONLY : nksq, eigqts, igkq
   USE uspp,                  ONLY : nkb
   USE wvfct,                 ONLY : nbnd, npwx
-  USE wavefunctions_module,  ONLY : evc
+  USE wavefunctions,         ONLY : evc
 
   IMPLICIT NONE
 

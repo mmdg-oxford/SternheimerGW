@@ -44,6 +44,7 @@ def generate_library_string(struct, key):
 
 string  = 'BASE_LIB = $(ESPRESSO)/Modules/libqemod.a             $(ESPRESSO)/FFTXlib/libqefft.a \\\n'
 string += '           $(ESPRESSO)/KS_Solvers/Davidson/libdavid.a $(ESPRESSO)/KS_Solvers/CG/libcg.a \\\n'
+string += '           $(ESPRESSO)/KS_Solvers/PPCG/libppcg.a \\\n'
 string += '           $(ESPRESSO)/LAXlib/libqela.a               $(ESPRESSO)/UtilXlib/libutil.a \\\n'
 string += '           $(ESPRESSO)/dft-d3/libdftd3qe.a $(ESPRESSO)/clib/clib.a $(ESPRESSO)/iotk/src/libiotk.a\n'
 string += 'PW_LIB = $(ESPRESSO)/PW/src/libpw.a\n'

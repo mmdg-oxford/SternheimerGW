@@ -38,7 +38,7 @@ subroutine dvqpsi_us (dvbarein, ik, addnlcc)
   USE nlcc_gw,              ONLY: nlcc_any
   USE noncollin_module,     ONLY: npol
   USE qpoint,               ONLY: npwq, ikks, ikqs
-  USE wavefunctions_module, ONLY: evc
+  USE wavefunctions,        ONLY: evc
   USE wvfct,                ONLY: nbnd, npw, npwx
 
   implicit none
