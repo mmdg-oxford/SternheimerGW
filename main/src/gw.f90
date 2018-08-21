@@ -27,14 +27,14 @@ program gw
   USE check_stop,           ONLY : check_stop_init
   USE control_gw,           ONLY : do_sigma_exx, do_sigma_matel, do_coulomb, &
                                    do_sigma_c, do_q0_only, do_imag, output
-  USE debug_module,         ONLY : debug_type
   USE disp,                 ONLY : num_k_pts, w_of_k_start, w_of_k_stop
   USE environment,          ONLY : environment_start
   USE exchange_module,      ONLY : exchange_wrapper
   USE freq_gw,              ONLY : nwsigma, nwsigwin, wsigmamin, wsigmamax, wcoulmax, nwcoul, &
                                    wsig_wind_min, wsig_wind_max, nwsigwin
-  USE freqbins_module,      ONLY : freqbins, freqbins_type
+  USE freqbins_module,      ONLY : freqbins
   USE gw_opening,           ONLY : gw_opening_logo, gw_opening_message
+  USE gw_type,              ONLY : calculation
   USE gwsigma,              ONLY : nbnd_sig, ecutsco, ecutsex
   USE input_parameters,     ONLY : max_seconds, force_symmorphic
   USE io_files,             ONLY : diropn
@@ -42,13 +42,10 @@ program gw
   USE mp_global,            ONLY : mp_startup
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
-  USE select_solver_module, ONLY : select_solver_type
-  USE setup_nscf_module,    ONLY : sigma_config_type
-  USE sigma_grid_module,    ONLY : sigma_grid, sigma_grid_type
+  USE sigma_grid_module,    ONLY : sigma_grid
   USE sigma_io_module,      ONLY : sigma_io_close_write
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup
-  USE truncation_module,    ONLY : vcut_type
 
   IMPLICIT NONE
 
@@ -58,26 +55,7 @@ program gw
   INTEGER             :: ik
   LOGICAL             :: do_band, do_matel
 
-  !> stores the frequencies uses for the calculation
-  TYPE(freqbins_type) freq
-
-  !> stores the FFT grids used in the calculation
-  TYPE(sigma_grid_type) grid
-
-  !> stores the configuration of the linear solver for the screened Coulomb interaction
-  TYPE(select_solver_type) config_coul
-
-  !> stores the configuration of the linear solver for the Green's function
-  TYPE(select_solver_type) config_green
-
-  !> stores the truncated Coulomb potential
-  TYPE(vcut_type) vcut
-
-  !> stores the configuration of the self-energy calculation
-  TYPE(sigma_config_type), ALLOCATABLE :: config(:)
-
-  !> the debug configuration of the calculation
-  TYPE(debug_type) debug
+  TYPE(calculation) calc
 
 ! Initialize MPI, clocks, print initial messages
   CALL mp_startup(start_images = .TRUE.)
@@ -87,18 +65,18 @@ program gw
   CALL start_clock(time_setup)
 ! Initialize GW calculation, Read Ground state information.
   
-  call gwq_readin(config_coul, config_green, freq, vcut, debug)
+  call gwq_readin(calc%config_coul, calc%config_green, calc%freq, calc%vcut, calc%debug)
   call check_stop_init()
   call check_initial_status()
 ! Initialize frequency grids, FFT grids for correlation
 ! and exchange operators, open relevant GW-files.
   call freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
-                wsig_wind_min, wsig_wind_max, nwsigwin, freq)
-  call sigma_grid(freq, ecutsex, ecutsco, grid)
-  call opengwfil(grid)
+                wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
+  call sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
+  call opengwfil(calc%grid)
   call stop_clock(time_setup)
 ! Calculation W
-  if(do_coulomb) call do_stern(config_coul, grid, freq)
+  if(do_coulomb) call do_stern(calc%config_coul, calc%grid, calc%freq)
   ik = 1
   do_band  = .TRUE.
   do_matel = .TRUE.
@@ -106,18 +84,19 @@ program gw
   if (.not.do_q0_only) then
       do ik = w_of_k_start, w_of_k_stop
          call start_clock(time_setup)
-         call run_nscf(do_band, do_matel, ik, config)
+         call run_nscf(do_band, do_matel, ik, calc%config)
          call initialize_gw(.FALSE.)
          call stop_clock(time_setup)
-         if (do_sigma_c) call sigma_wrapper(ik, grid, config_green, freq, vcut, config, debug)
+         if (do_sigma_c) call sigma_wrapper(ik, calc%grid, calc%config_green, &
+           calc%freq, calc%vcut, calc%config, calc%debug)
 ! Calculation of EXCHANGE energy \Sigma^{x}_{k}= \sum_{q}G_{k}{v_{k-S^{-1}q}}:
-         if (do_sigma_exx) call exchange_wrapper(ik, grid, vcut)
+         if (do_sigma_exx) call exchange_wrapper(ik, calc%grid, calc%vcut)
 ! Calculation of Matrix Elements <n\k| V^{xc}, \Sigma^{x}, \Sigma^{c}(iw) |n\k>:
          if (do_sigma_matel) then
            if (meta_ionode .AND. ik == w_of_k_start) then         
              call pp_output_open_all(num_k_pts, nbnd_sig, nwsigwin, nwsigma, output)
            end if
-           call sigma_matel(ik, grid, freq)
+           call sigma_matel(ik, calc%grid, calc%freq)
          end if
          call clean_pw_gw(.TRUE.)
       enddo
