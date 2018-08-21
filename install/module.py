@@ -94,6 +94,9 @@ structure = {
   "postproc": {
     depend: ["base", "vendor", "algo"],
   },
+  "type": {
+    depend: ["base", "util", "algo"],
+  },
 },
 }
 
