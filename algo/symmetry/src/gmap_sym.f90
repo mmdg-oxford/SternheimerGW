@@ -142,7 +142,6 @@
     !
     IF (notfound.gt.0) then
        write(6,'("WRITE GVEC not rotated properly gmap_sym.")')
-       write(1000+mpime,'("WRITE GVEC not rotated properly gmap_sym.")')
        stop
     ENDIF
     ! CALL errore ('gmap_sym','incomplete mapping of G vectors: notfound = ',notfound)

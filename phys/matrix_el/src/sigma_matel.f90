@@ -130,8 +130,6 @@ IMPLICIT NONE
   sigma_band_x = 0
   sigma_band_c = 0
 
-  WRITE(1000+mpime,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikq, (xk(ipol,ikq) , ipol = 1, 3)
-
   ! create map to G ordering at current k-point
   CALL gk_sort( xk(1,ikq), ngm, g, ( ecutwfc / tpiba2 ),&
                 npw, igk, g2kin )
@@ -147,10 +145,6 @@ IMPLICIT NONE
   ! generate v_xc(r) in real space:
   v%of_r = 0
   CALL v_xc( rho, rho_core, rhog_core, etxc, vtxc, v%of_r )
-
-  WRITE(1000+mpime, '("Taking Matels.")')
-  WRITE(1000+mpime, '("Taking NPWQ.", i4)') npwq
-  WRITE(1000+mpime, '("my_image_id", i4)') my_image_id
 
   ! loop over all bands
   DO jbnd = 1, nbnd_sig
@@ -185,11 +179,6 @@ IMPLICIT NONE
 
   END DO ! bands
 
-  WRITE(1000+mpime, '(4x,"VXC (eV)")')
-  WRITE(1000+mpime, '(8(1x,f7.3))') real(vxc(:,:))*RYTOEV
-  WRITE(1000+mpime, '("Max number Plane Waves WFC ", i4)') npwx
-  WRITE(1000+mpime, '("Sigma_Ex Matrix Element")') 
-
   !
   ! expectation value of Sigma_x
   !
@@ -214,17 +203,10 @@ IMPLICIT NONE
 
   ! evaluate matrix elements for exchange
   IF (file_size /= 0) CALL sigma_expect_file(iunsex,ik0,evc,sigma_x_ngm,igk,sigma_band_x)
-  WRITE(1000+mpime,*) 
-  WRITE(1000+mpime,'(4x,"sigma_x (eV)")')
-  WRITE(1000+mpime,'(8(1x,f7.3))') real(sigma_band_x)*RYTOEV
-  WRITE(1000+mpime,*) 
-  WRITE(1000+mpime,'(8(1x,f7.3))') aimag(sigma_band_x)*RYTOEV
 
   !
   ! expectation value of Sigma_c:
   !
-  WRITE(1000+mpime,*) 
-  WRITE(1000+mpime, '("sigma_c matrix element")') 
 
   ! open file containing correlation part of sigma
   INQUIRE( UNIT=iunsigma, OPENED=opnd )
@@ -242,17 +224,11 @@ IMPLICIT NONE
     CALL errore("sigma_matel", "Corr Conv must be greater than zero and less than ecutsco", 1)
   END IF
 
-  WRITE(1000+mpime, *)
-  WRITE(1000+mpime, '(5x, "G-Vects CORR_CONV:")')
-  WRITE(1000+mpime, '(5x, f6.2, i5)') corr_conv, sigma_c_ngm
-  WRITE(1000+mpime, *)
-
   ! check file size is not zero
   INQUIRE(UNIT = iunsigma, SIZE = file_size)
 
   ! evaluate expectation value of wave function
   IF (file_size /= 0) CALL sigma_expect_file(iunsigma,ik0,evc,sigma_c_ngm,igk,sigma_band_c,nwsigma)
-  WRITE (1000+mpime,'("Finished Sigma_c")')
 
   !
   ! analytic continuation from imaginary frequencies to real ones

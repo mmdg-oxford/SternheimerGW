@@ -225,7 +225,6 @@ IMPLICIT NONE
 
       ! for the direct solver W = eps^-1
       IF (solve_direct) THEN
-        WRITE(1000+mpime, '("UNFOLDING, INVERTING, WRITING W")')
         CALL start_clock(time_coul_invert)
         CALL invert_epsilon(num_g_corr, scrcoul_g, lgamma)
         CALL stop_clock(time_coul_invert)
