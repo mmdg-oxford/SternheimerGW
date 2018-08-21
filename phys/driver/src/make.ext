@@ -20,49 +20,18 @@
 # http://www.gnu.org/licenses/gpl.html .
 #
 #------------------------------------------------------------------------------
+OBJ += gw_input.o
 
-include ../../module
-include $(ESPRESSO)/make.inc
+gw_input.f90 : gw_input.yml input_generator.awk
+	awk -f input_generator.awk $< > $@
 
-SRC = $(wildcard *.f90) version.f90
-OBJ = $(SRC:.f90=.o)
-LIB = libutil.a
+tiddler: gw_input.yml input_generator.awk check-wiki
+	awk -f input_generator.awk -v tiddler=1 -v path=$(WIKI)/tiddlers $<
 
-MODFLAGS = $(BASEMOD_FLAGS) $(MOD_FLAG)$(ESPRESSO)/LR_Modules
-
-no_debug : .no_debug all
-.no_debug:
-	-if [ -f .debug ]; then rm -f debug.o .debug; fi
-	-touch $@
-
-debug : DFLAGS += -D__DEBUG
-debug : .debug all
-.debug:
-	-if [ -f .no_debug ]; then rm -f debug.o .no_debug; fi
-	-touch $@
-
-version : 
-	bash update_version
-
-version.f90 : version
-
-all: version $(LIB) 
-
-$(LIB) : $(OBJ)
-	$(AR) $(ARFLAGS) $@ $?
-	$(RANLIB) $@
-
-depend: tmp.depend
-	awk '!/@/' $< > make.depend
-
-tmp.depend: $(SRC)
-	$(ESPRESSO)/install/moduledep.sh > $@
-	$(ESPRESSO)/install/includedep.sh >> $@
-
-clean:
-	-rm *.o *.mod $(LIB)
-
-.PHONY: all debug no_debug clean depend version
-.INTERMEDIATE: tmp.depend
-
--include make.depend
+check-wiki:
+ifndef WIKI
+	$(error WIKI must be set to the path to the wiki.)
+endif
+ifeq ("$(wildcard $(WIKI)/tiddlers)", "")
+	$(error directory $(WIKI)/tiddlers does not exist)
+endif

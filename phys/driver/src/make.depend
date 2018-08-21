@@ -1,0 +1,2 @@
+gwq_readin.o : gw_input.o
+setup.o : driver.o

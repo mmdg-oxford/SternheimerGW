@@ -24,57 +24,30 @@ program gw
 !-----------------------------------------------------------------------
 !... This is the main driver of the SternheimerGW code.
 !-----------------------------------------------------------------------
-  USE check_stop,           ONLY : check_stop_init
   USE control_gw,           ONLY : do_sigma_exx, do_sigma_matel, do_coulomb, &
-                                   do_sigma_c, do_q0_only, do_imag, output
+                                   do_sigma_c, do_q0_only, output
   USE disp,                 ONLY : num_k_pts, w_of_k_start, w_of_k_stop
-  USE environment,          ONLY : environment_start
   USE exchange_module,      ONLY : exchange_wrapper
-  USE freq_gw,              ONLY : nwsigma, nwsigwin, wsigmamin, wsigmamax, wcoulmax, nwcoul, &
-                                   wsig_wind_min, wsig_wind_max, nwsigwin
-  USE freqbins_module,      ONLY : freqbins
-  USE gw_opening,           ONLY : gw_opening_logo, gw_opening_message
+  USE freq_gw,              ONLY : nwsigma, nwsigwin
   USE gw_driver,            ONLY : calculation
-  USE gwsigma,              ONLY : nbnd_sig, ecutsco, ecutsex
-  USE input_parameters,     ONLY : max_seconds, force_symmorphic
-  USE io_files,             ONLY : diropn
+  USE gwsigma,              ONLY : nbnd_sig
   USE io_global,            ONLY : meta_ionode
-  USE mp_global,            ONLY : mp_startup
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
-  USE sigma_grid_module,    ONLY : sigma_grid
+  USE setup,                ONLY : setup_calculation
   USE sigma_io_module,      ONLY : sigma_io_close_write
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup
 
   IMPLICIT NONE
 
-  !> the name of the code
-  CHARACTER(*), PARAMETER :: code = 'SternheimerGW'
-
   INTEGER             :: ik
   LOGICAL             :: do_band, do_matel
 
   TYPE(calculation) calc
 
-! Initialize MPI, clocks, print initial messages
-  CALL mp_startup(start_images = .TRUE.)
-  CALL gw_opening_logo()
-  CALL environment_start(code)
-  CALL gw_opening_message() 
-  CALL start_clock(time_setup)
-! Initialize GW calculation, Read Ground state information.
-  
-  call gwq_readin(calc%config_coul, calc%config_green, calc%freq, calc%vcut, calc%debug)
-  call check_stop_init()
-  call check_initial_status()
-! Initialize frequency grids, FFT grids for correlation
-! and exchange operators, open relevant GW-files.
-  call freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
-                wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
-  call sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
-  call opengwfil(calc%grid)
-  call stop_clock(time_setup)
+  CALL setup_calculation(calc)
+
 ! Calculation W
   if(do_coulomb) call do_stern(calc%config_coul, calc%grid, calc%freq)
   ik = 1
