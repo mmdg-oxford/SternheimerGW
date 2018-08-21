@@ -56,6 +56,8 @@ END SUBROUTINE stop_gw
 
 SUBROUTINE stop_smoothly_gw(flag)
 
+  USE close_gwq_mod, ONLY : close_gwq
+
   IMPLICIT NONE
   LOGICAL, INTENT(IN) :: flag
 

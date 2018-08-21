@@ -286,7 +286,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   output_t%pp_im_corr_iw%filename = ''
   output_t%pp_spec%filename       = ''
   output_t%pp_spec_iw%filename    = ''
-  output_t%file_sigma             = output%file_sigma
+  output_t%file_data              = output%file_data
 
 ! if corr_conv not set in input file default to the full
 ! correlation cutoff.
@@ -436,7 +436,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   IF (ierr > 0) CALL errore(__FILE__, "error when opening/creating directory for output", ierr)
 
   ! augment sigma file with output directory
-  output_t%file_sigma = TRIM(output_t%directory) // output_t%file_sigma
+  output_t%file_data = TRIM(output_t%directory) // output_t%file_data
 
   CALL check_tempdir ( tmp_dir_gw, exst, parallelfs )
 

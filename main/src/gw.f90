@@ -24,18 +24,18 @@ program gw
 !-----------------------------------------------------------------------
 !... This is the main driver of the SternheimerGW code.
 !-----------------------------------------------------------------------
+  USE close_gwq_mod,        ONLY : close_gwq
   USE control_gw,           ONLY : do_sigma_exx, do_sigma_matel, do_coulomb, &
                                    do_sigma_c, do_q0_only, output
   USE disp,                 ONLY : num_k_pts, w_of_k_start, w_of_k_stop
+  USE driver,               ONLY : calculation
   USE exchange_module,      ONLY : exchange_wrapper
   USE freq_gw,              ONLY : nwsigma, nwsigwin
-  USE gw_driver,            ONLY : calculation
   USE gwsigma,              ONLY : nbnd_sig
   USE io_global,            ONLY : meta_ionode
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
   USE setup,                ONLY : setup_calculation
-  USE sigma_io_module,      ONLY : sigma_io_close_write
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup
 
@@ -60,10 +60,10 @@ program gw
          call run_nscf(do_band, do_matel, ik, calc%config)
          call initialize_gw(.FALSE.)
          call stop_clock(time_setup)
-         if (do_sigma_c) call sigma_wrapper(ik, calc%grid, calc%config_green, &
+         if (do_sigma_c) call sigma_wrapper(ik, calc, calc%grid, calc%config_green, &
            calc%freq, calc%vcut, calc%config, calc%debug)
 ! Calculation of EXCHANGE energy \Sigma^{x}_{k}= \sum_{q}G_{k}{v_{k-S^{-1}q}}:
-         if (do_sigma_exx) call exchange_wrapper(ik, calc%grid, calc%vcut)
+         if (do_sigma_exx) call exchange_wrapper(ik, calc, calc%grid, calc%vcut)
 ! Calculation of Matrix Elements <n\k| V^{xc}, \Sigma^{x}, \Sigma^{c}(iw) |n\k>:
          if (do_sigma_matel) then
            if (meta_ionode .AND. ik == w_of_k_start) then         
@@ -74,8 +74,7 @@ program gw
          call clean_pw_gw(.TRUE.)
       enddo
   end if
-  call close_gwq(.TRUE.)
-  IF (meta_ionode) CALL sigma_io_close_write(output%unit_sigma)
+  call close_gwq(.TRUE., calc%data)
   call stop_gw( .TRUE. )
 
 end program gw

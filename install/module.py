@@ -69,7 +69,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "util"],
   },
   "teardown": {
-    depend: ["base", "pw", "lrmods", "util", "data"],
+    depend: ["base", "pw", "lrmods", "util", "data", "io"],
   },
   "truncation": {
     depend: ["base", "util"],
@@ -77,7 +77,7 @@ structure = {
 },
 "phys": {
   "corr": {
-    depend: ["base", "pw", "vendor", "util", "data", "algo", "coul", "green"],
+    depend: ["base", "pw", "vendor", "util", "data", "algo", "driver", "coul", "green"],
   },
   "coul": {
     depend: ["base", "pw", "lrmods", "util", "data", "algo", "postproc"],
@@ -86,7 +86,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "util", "data", "algo"],
   },
   "exch": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
   },
   "green": {
     depend: ["base", "pw", "util", "data", "algo"],

@@ -34,7 +34,7 @@ CONTAINS
     USE freq_gw,           ONLY: nwsigma, nwsigwin, wsigmamin, wsigmamax, wcoulmax, nwcoul, &
                                  wsig_wind_min, wsig_wind_max, nwsigwin
     USE freqbins_module,   ONLY: freqbins
-    USE gw_driver,         ONLY: calculation
+    USE driver,            ONLY: calculation
     USE gw_opening,        ONLY: gw_opening_logo, gw_opening_message
     USE gwsigma,           ONLY: ecutsco, ecutsex
     USE mp_global,         ONLY: mp_startup
@@ -59,7 +59,7 @@ CONTAINS
     CALL freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
-    CALL opengwfil(calc%grid)
+    CALL opengwfil(calc%data, calc%grid)
     CALL stop_clock(time_setup)
     !
   END SUBROUTINE setup_calculation

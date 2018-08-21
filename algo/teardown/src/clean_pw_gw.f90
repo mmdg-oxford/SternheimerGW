@@ -30,6 +30,7 @@ SUBROUTINE clean_pw_gw(flag)
   ! gwq_readin, so that it is possible to start a calculation at
   ! a new q.
   !
+  USE close_gwq_mod,   ONLY : close_gwq
   USE control_flags,   ONLY : twfcollect
   USE lr_symm_base,    ONLY : nsymq
   !

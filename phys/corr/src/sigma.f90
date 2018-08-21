@@ -120,19 +120,22 @@ CONTAINS
 
   !> This function provides a wrapper that extracts the necessary information
   !! from the global modules to evaluate the self energy.
-  SUBROUTINE sigma_wrapper(ikpt, grid, config_green, freq, vcut, config, debug)
+  SUBROUTINE sigma_wrapper(ikpt, calc, grid, config_green, freq, vcut, config, debug)
 
     USE analytic_module,      ONLY: analytic_coeff
     USE cell_base,            ONLY: omega
     USE constants,            ONLY: tpi
+    USE container_interface,  ONLY: element_type
     USE control_gw,           ONLY: output, tmp_dir_coul, model_coul, tr2_gw
     USE coulpade_module,      ONLY: coulpade
     USE debug_module,         ONLY: debug_type, debug_set, test_nan
-    USE disp,                 ONLY: x_q
+    USE disp,                 ONLY: x_q, num_k_pts
+    USE driver,               ONLY: calculation
     USE ener,                 ONLY: ef
     USE fft6_module,          ONLY: fft_map_generate
     USE freqbins_module,      ONLY: freqbins_type
     USE gvect,                ONLY: mill
+    USE gw_data,              ONLY: var_corr
     USE io_files,             ONLY: prefix
     USE io_global,            ONLY: meta_ionode, ionode_id, stdout
     USE kinds,                ONLY: dp
@@ -145,7 +148,6 @@ CONTAINS
     USE select_solver_module, ONLY: select_solver_type
     USE setup_nscf_module,    ONLY: sigma_config_type
     USE sigma_grid_module,    ONLY: sigma_grid_type
-    USE sigma_io_module,      ONLY: sigma_io_write_c
     USE symm_base,            ONLY: nsym, s, invs, ftau, nrot
     USE timing_module,        ONLY: time_sigma_c, time_sigma_setup, &
                                     time_sigma_io, time_sigma_comm
@@ -154,6 +156,9 @@ CONTAINS
 
     !> index of the k-point for which the self energy is evaluated
     INTEGER, INTENT(IN) :: ikpt
+
+    !> Stores the data produced by the GW calculation
+    TYPE(calculation), INTENT(INOUT) :: calc
 
     !> the FFT grids used for the Fourier transformation
     TYPE(sigma_grid_type), INTENT(IN) :: grid
@@ -172,6 +177,8 @@ CONTAINS
 
     !> the debug configuration of the calculation
     TYPE(debug_type), INTENT(IN) :: debug
+
+    TYPE(element_type) element
 
     !> complex constant of zero
     COMPLEX(dp), PARAMETER :: zero = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
@@ -218,7 +225,7 @@ CONTAINS
     COMPLEX(dp), ALLOCATABLE :: sigma(:,:,:)
 
     !> the self-energy at the current k-point collected on the root process
-    COMPLEX(dp), ALLOCATABLE :: sigma_root(:,:,:)
+    COMPLEX(dp), ALLOCATABLE :: sigma_root(:,:,:,:)
 
     !> number of bytes in a real
     INTEGER, PARAMETER   :: byte_real = 8
@@ -369,7 +376,7 @@ CONTAINS
     ! unpack sigma in the large array
     IF (me_pool == root_pool) THEN
       !
-      ALLOCATE(sigma_root(num_g_corr, num_g_corr, freq%num_sigma()), STAT = ierr)
+      ALLOCATE(sigma_root(num_g_corr, num_g_corr, freq%num_sigma(), 1), STAT = ierr)
       IF (ierr /= 0) THEN
         CALL errore(__FILE__, "error allocating array to collect sigma", ierr)
         RETURN
@@ -378,10 +385,10 @@ CONTAINS
       sigma_root = zero
       !
       DO ifreq = 1, freq%num_sigma()
-        sigma_root(:, fft_map, ifreq) = sigma(:,:,ifreq)
+        sigma_root(:, fft_map, ifreq, 1) = sigma(:,:,ifreq)
       END DO
       !
-      CALL mp_root_sum(inter_image_comm, root_image, sigma_root)
+      CALL mp_root_sum(inter_image_comm, root_image, sigma_root(:,:,:,1))
       !
     END IF
 
@@ -393,14 +400,21 @@ CONTAINS
     ! the root process writes sigma to file
     !
     CALL start_clock(time_sigma_io)
+    CALL calc%data%write_dimension(var_corr, [num_g_corr, num_g_corr, freq%num_sigma(), num_k_pts], ierr)
+    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
     IF (meta_ionode .AND. ALLOCATED(sigma_root)) THEN
       !
       DO ifreq = 1, freq%num_sigma()
         irec = (ikpt - 1) * freq%num_sigma() + ifreq
-        CALL davcio(sigma_root(:,:,ifreq), lrsigma, iunsigma, irec, 1)
+        CALL davcio(sigma_root(:,:,ifreq, 1), lrsigma, iunsigma, irec, 1)
       END DO ! ifreq
       !
-      CALL sigma_io_write_c(output%unit_sigma, ikpt, sigma_root)
+      element%variable = var_corr
+      element%access_index = ikpt
+      CALL MOVE_ALLOC(sigma_root, calc%data%corr)
+      CALL calc%data%write_element(element, ierr)
+      CALL errore(__FILE__, "Error writing correlation self energy", ierr)
+      DEALLOCATE(calc%data%corr)
       !
     END IF ! ionode
     CALL stop_clock(time_sigma_io)

@@ -381,11 +381,11 @@ gw_output:
     description: Extension to filename in which the correlation contribution is stored. The
       file generated will have the name prefix.file_corr.
  
-  file_sigma:
+  file_data:
     type: character(len=256)
-    default: 'sigma.xml'
-    description: XML file that contains both exchange and correlation contribution and some
-      information to allow reading that information.
+    default: 'gw_data'
+    description: Data file that contains intermediate result of the SternheimerGW calculation
+      to allow for restarting from an interrupted run.
 
   file_dft:
     type: character(len=256)

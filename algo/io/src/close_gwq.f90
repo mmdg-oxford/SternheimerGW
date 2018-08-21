@@ -22,7 +22,11 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-SUBROUTINE close_gwq(flag)
+MODULE close_gwq_mod
+
+CONTAINS
+
+SUBROUTINE close_gwq(flag, data)
   !----------------------------------------------------------------------------
   !
   ! ... Close all files.
@@ -32,11 +36,14 @@ SUBROUTINE close_gwq(flag)
   USE buffers,         ONLY : close_buffer
   USE control_flags,   ONLY : twfcollect
   USE control_gw,      ONLY : do_coulomb
+  USE gw_data,         ONLY : gw_data_container
   USE units_gw,        ONLY : iuwfc, iubar
 
   IMPLICIT NONE
 
   LOGICAL, INTENT(IN) :: flag
+  TYPE(gw_data_container), INTENT(INOUT), OPTIONAL :: data
+  INTEGER ierr
 
   IF (twfcollect) THEN
     CALL close_buffer(iuwfc, 'delete')
@@ -50,4 +57,11 @@ SUBROUTINE close_gwq(flag)
     CALL close_buffer(iubar, 'keep')
   END IF
 
+  IF (flag .AND. PRESENT(data)) THEN
+    CALL data%close(ierr)
+    CALL errore(__FILE__, "Error closing GW data container", ierr)
+  END IF
+
 END SUBROUTINE close_gwq
+
+END MODULE close_gwq_mod

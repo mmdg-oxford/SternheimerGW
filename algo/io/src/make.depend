@@ -1,2 +1,3 @@
+close_gwq.o : gw_data.o
 openfilq.o : save_gw_input.o
-opengwfil.o : sigma_io.o
+opengwfil.o : gw_data.o
