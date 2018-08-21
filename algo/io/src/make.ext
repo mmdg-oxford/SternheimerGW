@@ -20,42 +20,8 @@
 # http://www.gnu.org/licenses/gpl.html .
 #
 #------------------------------------------------------------------------------
+CONTAINER = gw_data.f90
+EXTERN = $(CONTAINER)
 
-include ../../../module
-include $(ESPRESSO)/make.inc
-.DEFAULT_GOAL = all
-
-SRC = $(wildcard *.f90)
-OBJ = $(SRC:.f90=.o)
-LIB = lib@LIB@.a
--include make.ext
-
-MODFLAGS =@MOD@
-
-all: $(EXTERN) lib mod
-
-lib: $(LIB)
-
-mod: $(OBJ)
-	for file in $$(ls *.mod); do \
-	  ln -f -s $(CURDIR)/$$file -t ../../module/; \
-	done
-
-depend: tmp.depend
-	awk '!/@/' $< > make.depend
-
-tmp.depend: $(SRC)
-	$(ESPRESSO)/install/moduledep.sh > $@
-	$(ESPRESSO)/install/includedep.sh >> $@
-
-$(LIB) : $(OBJ)
-	$(AR) $(ARFLAGS) $@ $?
-	$(RANLIB) $@
-
-clean:
-	-rm -f *.o *.mod $(LIB)
-
-.PHONY: all lib mod depend
-.INTERMEDIATE: tmp.depend
-
--include make.depend
+$(CONTAINER): create_container_module.py
+	python $< > $@
