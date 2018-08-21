@@ -82,6 +82,9 @@ structure = {
   "coul": {
     depend: ["base", "pw", "lrmods", "util", "data", "algo", "postproc"],
   },
+  "driver": {
+    depend: ["base", "util", "algo"],
+  },
   "exch": {
     depend: ["base", "pw", "lrmods", "util", "data", "algo"],
   },
@@ -93,9 +96,6 @@ structure = {
   },  
   "postproc": {
     depend: ["base", "vendor", "algo"],
-  },
-  "type": {
-    depend: ["base", "util", "algo"],
   },
 },
 }

@@ -34,7 +34,7 @@ program gw
                                    wsig_wind_min, wsig_wind_max, nwsigwin
   USE freqbins_module,      ONLY : freqbins
   USE gw_opening,           ONLY : gw_opening_logo, gw_opening_message
-  USE gw_type,              ONLY : calculation
+  USE gw_driver,            ONLY : calculation
   USE gwsigma,              ONLY : nbnd_sig, ecutsco, ecutsex
   USE input_parameters,     ONLY : max_seconds, force_symmorphic
   USE io_files,             ONLY : diropn

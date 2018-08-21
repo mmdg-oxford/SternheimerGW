@@ -20,7 +20,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-MODULE gw_type
+MODULE gw_driver
 
   USE debug_module,         ONLY: debug_type
   USE freqbins_module,      ONLY: freqbins_type
@@ -52,4 +52,4 @@ MODULE gw_type
     TYPE(vcut_type) vcut
   END TYPE calculation
 
-END MODULE gw_type
+END MODULE gw_driver
