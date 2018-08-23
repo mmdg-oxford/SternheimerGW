@@ -126,7 +126,7 @@ CONTAINS
     USE cell_base,            ONLY: omega
     USE constants,            ONLY: tpi
     USE container_interface,  ONLY: element_type
-    USE control_gw,           ONLY: output, tmp_dir_coul, model_coul, tr2_gw
+    USE control_gw,           ONLY: tmp_dir_coul, model_coul, tr2_gw
     USE coulpade_module,      ONLY: coulpade
     USE debug_module,         ONLY: debug_type, debug_set, test_nan
     USE disp,                 ONLY: x_q, num_k_pts

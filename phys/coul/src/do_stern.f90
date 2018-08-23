@@ -38,7 +38,6 @@ SUBROUTINE do_stern(config, grid, freq)
   USE klist,                ONLY: lgauss
   USE mp,                   ONLY: mp_sum, mp_barrier
   USE mp_images,            ONLY: inter_image_comm, my_image_id
-  USE mp_world,             ONLY: mpime
   USE parallel_module,      ONLY: parallel_task, mp_gatherv
   USE plot_coulomb_module,  ONLY: plot_coulomb
   USE run_nscf_module,      ONLY: run_nscf

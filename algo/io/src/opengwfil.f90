@@ -28,7 +28,7 @@ SUBROUTINE opengwfil(data, grid)
   USE MPI,                 ONLY: MPI_COMM_WORLD, MPI_MODE_CREATE, MPI_MODE_RDWR
 
   USE disp,              ONLY : xk_kpoints, num_k_pts
-  USE freq_gw,           ONLY : nfs, nwsigma
+  USE freq_gw,           ONLY : nfs
   USE io_files,          ONLY : diropn, seqopn
   USE io_global,         ONLY : meta_ionode
   USE output_mod,        ONLY : filcoul, filsigx, filsigc

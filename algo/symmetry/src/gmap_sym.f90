@@ -45,7 +45,6 @@
   USE fft_base,      ONLY : dfftp
   USE gvect,         ONLY : mill, ngm
   USE kinds,         ONLY : DP
-  USE mp_world,      ONLY : mpime
 
   implicit none
   !
