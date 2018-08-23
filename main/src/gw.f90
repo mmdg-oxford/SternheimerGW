@@ -50,7 +50,7 @@ PROGRAM gw
   CALL setup_calculation(calc)
 
 ! Calculation W
-  IF(do_coulomb) CALL do_stern(calc%config_coul, calc%grid, calc%freq)
+  IF(do_coulomb) CALL do_stern(calc)
   ik = 1
   do_band  = .TRUE.
   do_matel = .TRUE.

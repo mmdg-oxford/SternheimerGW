@@ -330,7 +330,7 @@ CONTAINS
   !! Then, we can extend an given input array for which only the first half
   !! of the frequencies was calculated to the full mesh by adding the complex
   !! conjugate to the end.
-  SUBROUTINE freqbins_symm(freq_in, freq_out, array)
+  SUBROUTINE freqbins_symm(freq_in, freq_out, array_in, array_out)
 
     USE constants, ONLY: eps14
     USE kinds,     ONLY: dp
@@ -341,9 +341,11 @@ CONTAINS
     !> the full frequency array
     COMPLEX(dp), INTENT(OUT), ALLOCATABLE :: freq_out(:)
 
-    !> *on input*: The first half of the array \f$A\f$ <br>
-    !! *on output*: The full array \f$A\f$ (extended by its complex conjugate).
-    COMPLEX(dp), INTENT(INOUT), OPTIONAL  :: array(:,:,:)
+    !> The unsymmetrized array \f$A\f$
+    COMPLEX(dp), INTENT(IN), OPTIONAL :: array_in(:,:,:)
+
+    !> The symmetrized array array \f$A\f$ (extended by its complex conjugate).
+    COMPLEX(dp), INTENT(OUT), ALLOCATABLE, OPTIONAL :: array_out(:,:,:)
 
     !> original number of frequencies
     INTEGER num_freq
@@ -363,10 +365,17 @@ CONTAINS
     ! set helper variable
     num_freq = SIZE(freq_in%solver)
 
+    IF (PRESENT(array_in).AND..NOT.PRESENT(array_out)) THEN
+      CALL errore(__FILE__, "Cannot create copy if only input array is present", 1)
+      IF (SIZE(array_in, 3) /= num_freq) &
+        CALL errore(__FILE__, "Array size inconsistent with solver", 1)
+    END IF
+
     ! trivial case - symmetry not used => return same frequency used for solver
     IF (freq_in%freq_symm_coul == no_symmetry) THEN
       ALLOCATE(freq_out(num_freq))
       freq_out = freq_in%solver
+      IF (PRESENT(array_in)) array_out = array_in
       RETURN
     END IF
 
@@ -374,6 +383,7 @@ CONTAINS
     IF (freq_in%freq_symm_coul == square_symmetry) THEN
       ALLOCATE(freq_out(num_freq))
       freq_out = freq_in%solver**2
+      IF (PRESENT(array_in)) array_out = array_in
       RETURN
     END IF
 
@@ -389,17 +399,9 @@ CONTAINS
     ! determine number of frequencies
     num_freq_sym = 2 * num_freq - num_zero
     ALLOCATE(freq_out(num_freq_sym))
-
-    !
-    ! sanity test
-    !
-    IF (PRESENT(array)) THEN
-
-      ! frequency and array should habe same dimension
-      IF (SIZE(array, 3) /= num_freq_sym) THEN
-        CALL errore(__FILE__, "array and frequency mesh inconsistent", 1)
-      END IF
-
+    IF (PRESENT(array_in)) THEN
+      ALLOCATE(array_out(SIZE(array_in, 1), SIZE(array_in, 2), num_freq_sym))
+      array_out(:,:,:num_freq) = array_in
     END IF
 
     !
@@ -416,7 +418,7 @@ CONTAINS
         ! duplicate nonzero elements
         ifreq_sym = ifreq_sym + 1
         freq_out(ifreq_sym) = -freq_in%solver(ifreq)
-        IF (PRESENT(array)) array(:, :, ifreq_sym) = array(:, :, ifreq)
+        IF (PRESENT(array_in)) array_out(:, :, ifreq_sym) = array_in(:, :, ifreq)
         !
       END IF
       !

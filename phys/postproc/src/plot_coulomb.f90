@@ -60,11 +60,11 @@ CONTAINS
     !> the screened coulomb interaction for these frequencies
     COMPLEX(dp),           INTENT(IN) :: coulomb(:,:,:)
 
-    !> copy of the screened coulomb interaction
-    COMPLEX(dp), ALLOCATABLE :: scrcoul_in(:,:,:)
+    !> coefficient of the analytic continuation
+    COMPLEX(dp), ALLOCATABLE :: coulomb_coeff(:,:,:)
 
     !> result of the analytic continuation
-    COMPLEX(dp), ALLOCATABLE :: scrcoul_out(:,:,:)
+    COMPLEX(dp), ALLOCATABLE :: coulomb_analytic(:,:,:)
 
     !> work array
     COMPLEX(dp), ALLOCATABLE :: work(:,:)
@@ -95,18 +95,15 @@ CONTAINS
     !
     ! evaluate coefficients for analytic continuation
     !
-    ! create a copy of coulomb
-    ALLOCATE(scrcoul_in(num_g, num_g, freq%num_freq()))
-    scrcoul_in(:, :, 1:SIZE(coulomb, 3)) = coulomb
 
     ! evaluate coefficients for screening model
-    CALL analytic_coeff(model_coul, thres, freq, scrcoul_in)
+    CALL analytic_coeff(model_coul, thres, freq, coulomb, coulomb_coeff)
 
     !
     ! perform analytic continuation to the desired output mesh
     !
     ! create array for the results
-    ALLOCATE(scrcoul_out(num_g, num_g, freq%num_coul()))
+    ALLOCATE(coulomb_analytic(num_g, num_g, freq%num_coul()))
 
     ! create symmetry map
     ALLOCATE(gmapsym(num_g))
@@ -114,8 +111,8 @@ CONTAINS
 
     ! perform analytic continuation
     DO ifreq = 1, freq%num_coul()
-      CALL analytic_eval(gmapsym, grid, freq, scrcoul_in, freq%coul(ifreq), work)
-      scrcoul_out(:,:,ifreq) = work
+      CALL analytic_eval(gmapsym, grid, freq, coulomb_coeff, freq%coul(ifreq), work)
+      coulomb_analytic(:,:,ifreq) = work
     END DO ! ifreq
 
     !
@@ -130,7 +127,7 @@ CONTAINS
         ! plot the frequency dependent Coulomb interaction
         WRITE(stdout, '(17x,a,18x,a,i6,a,i6,a)') 'omega', 'W(', ig, ', ', igp, ', omega)'
         DO ifreq = 1, freq%num_coul()
-          WRITE(stdout, '(5x,2f15.8,2x,2f15.8)') freq%coul(ifreq) * RYTOEV, scrcoul_out(ig, igp, ifreq)
+          WRITE(stdout, '(5x,2f15.8,2x,2f15.8)') freq%coul(ifreq) * RYTOEV, coulomb_analytic(ig, igp, ifreq)
         END DO ! ifreq
         WRITE(stdout, '(a)')
 

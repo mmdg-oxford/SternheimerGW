@@ -126,28 +126,25 @@ CONTAINS
     USE cell_base,            ONLY: omega
     USE constants,            ONLY: tpi
     USE container_interface,  ONLY: element_type
-    USE control_gw,           ONLY: tmp_dir_coul, model_coul, tr2_gw
+    USE control_gw,           ONLY: model_coul, tr2_gw
     USE coulpade_module,      ONLY: coulpade
     USE debug_module,         ONLY: debug_set, test_nan
-    USE disp,                 ONLY: x_q, num_k_pts
+    USE disp,                 ONLY: x_q, num_k_pts, nqs
     USE driver,               ONLY: calculation
     USE ener,                 ONLY: ef
     USE fft6_module,          ONLY: fft_map_generate
     USE gvect,                ONLY: mill
-    USE gw_data,              ONLY: var_corr
-    USE io_files,             ONLY: prefix
+    USE gw_data,              ONLY: var_corr, var_coul
     USE io_global,            ONLY: meta_ionode, ionode_id, stdout
     USE kinds,                ONLY: dp
     USE klist,                ONLY: xk, lgauss
     USE mp,                   ONLY: mp_bcast
     USE mp_images,            ONLY: inter_image_comm, root_image
     USE mp_pools,             ONLY: inter_pool_comm, root_pool, me_pool
-    USE output_mod,           ONLY: filcoul
     USE parallel_module,      ONLY: mp_root_sum
     USE symm_base,            ONLY: nsym, s, invs, ftau, nrot
     USE timing_module,        ONLY: time_sigma_c, time_sigma_setup, &
                                     time_sigma_io, time_sigma_comm
-    USE units_gw,             ONLY: iuncoul, lrcoul
 
     !> index of the k-point for which the self energy is evaluated
     INTEGER, INTENT(IN) :: ikpt
@@ -195,8 +192,8 @@ CONTAINS
     !> the map from local to global G vectors
     INTEGER, ALLOCATABLE :: fft_map(:)
 
-    !> the screened Coulomb interaction
-    COMPLEX(dp), ALLOCATABLE :: coulomb(:,:,:)
+    !> coefficients of the analytic continuation
+    COMPLEX(dp), ALLOCATABLE :: coul_coeff(:,:,:)
 
     !> the self-energy at the current k-point
     COMPLEX(dp), ALLOCATABLE :: sigma(:,:,:)
@@ -204,17 +201,11 @@ CONTAINS
     !> number of bytes in a real
     INTEGER, PARAMETER   :: byte_real = 8
 
-    !> name of file in which the Coulomb interaction is store
-    CHARACTER(:), ALLOCATABLE :: filename
-
     !> counter on the frequencies
     INTEGER ifreq
 
     !> error flag from file opening
     INTEGER ierr
-
-    !> flag indicating whether Coulomb file is already opened
-    LOGICAL opend
 
     !> debug correlation part of self energy
     LOGICAL debug_sigma
@@ -275,24 +266,9 @@ CONTAINS
     sigma = zero
 
     !
-    ! open the file containing the coulomb interaction
-    ! TODO a wrapper routine for all I/O
-    !
-    INQUIRE(UNIT = iuncoul, OPENED = opend)
-    IF (.NOT. opend) THEN
-      !
-      filename = TRIM(tmp_dir_coul) // TRIM(prefix) // "." // TRIM(filcoul) // "1"
-      OPEN(UNIT = iuncoul, FILE = filename, IOSTAT = ierr, &
-           ACCESS = 'direct', STATUS = 'old', RECL = byte_real * lrcoul)
-      CALL errore(__FILE__, "error opening " // filename, ierr)
-      !
-    END IF ! open file
-    !
     ! initialize index of q (set to 0 so that it is always read on first call)
-    iq = 0
     !
-    ! allocate array for the coulomb matrix
-    ALLOCATE(coulomb(num_g_corr, num_g_corr, calc%freq%num_freq()))
+    iq = 0
 
     !
     ! sum over all q-points
@@ -306,13 +282,17 @@ CONTAINS
       IF (calc%config(icon)%index_q /= iq) THEN
         !
         iq = calc%config(icon)%index_q
-        CALL davcio(coulomb, lrcoul, iuncoul, iq, -1)
-        CALL coulpade(x_q(:,iq), calc%vcut, coulomb)
-        CALL analytic_coeff(model_coul, tr2_gw, calc%freq, coulomb)
+        element%variable = var_coul
+        element%access_index = iq
+        CALL calc%data%read_element(element, ierr)
+        CALL errore(__FILE__, "Error reading Coulomb matrix", ierr)
+        CALL coulpade(x_q(:,iq), calc%vcut, calc%data%coul(:,:,:,1))
+        CALL analytic_coeff(model_coul, tr2_gw, calc%freq, calc%data%coul(:,:,:,1), coul_coeff)
+        DEALLOCATE(calc%data%coul)
         !
         ! check if any NaN occured in coulpade
         IF (debug_sigma) THEN
-          IF (ANY(test_nan(coulomb))) THEN
+          IF (ANY(test_nan(calc%data%coul))) THEN
             CALL errore(__FILE__, 'Found a NaN in Coulomb after analytic continuation', iq)
           END IF
         END IF
@@ -328,12 +308,11 @@ CONTAINS
       CALL sigma_correlation(omega, calc%grid, calc%config_green,  &
                              mu, alpha, calc%config(icon)%index_kq, calc%freq, &
                              gmapsym(:, calc%config(icon)%sym_op), &
-                             coulomb, sigma, calc%debug)
+                             coul_coeff, sigma, calc%debug)
       !
     END DO ! icon
 
     DEALLOCATE(gmapsym)
-    DEALLOCATE(coulomb)
 
     !
     ! collect sigma on a single process

@@ -80,7 +80,7 @@ structure = {
     depend: ["base", "pw", "vendor", "util", "data", "algo", "driver", "coul", "green"],
   },
   "coul": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo", "postproc"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "postproc", "driver"],
   },
   "driver": {
     depend: ["base", "pw", "lrmods", "util", "data", "algo"],
