@@ -256,9 +256,10 @@ CONTAINS
     CALL allocate_copy_from_to(A_matrix, work%A_matrix)
     CALL allocate_copy_from_to(B_matrix, work%B_matrix)
     ALLOCATE(work%numerator(work%size), work%denominator(work%size))
+    ALLOCATE(work%real_(8 * work%size))
     opt_size = eigenvalue_work_size(jobv, work, info)
     IF (info /= no_error) RETURN
-    ALLOCATE(work%complex_(opt_size), work%real_(8 * work%size))
+    ALLOCATE(work%complex_(opt_size))
     ! 
   END SUBROUTINE allocate_for_eigenvalue
 
