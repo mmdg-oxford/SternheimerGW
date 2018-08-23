@@ -120,7 +120,7 @@ CONTAINS
 
   !> This function provides a wrapper that extracts the necessary information
   !! from the global modules to evaluate the self energy.
-  SUBROUTINE sigma_wrapper(ikpt, calc, grid, config_green, freq, vcut, config, debug)
+  SUBROUTINE sigma_wrapper(ikpt, calc)
 
     USE analytic_module,      ONLY: analytic_coeff
     USE cell_base,            ONLY: omega
@@ -128,12 +128,11 @@ CONTAINS
     USE container_interface,  ONLY: element_type
     USE control_gw,           ONLY: tmp_dir_coul, model_coul, tr2_gw
     USE coulpade_module,      ONLY: coulpade
-    USE debug_module,         ONLY: debug_type, debug_set, test_nan
+    USE debug_module,         ONLY: debug_set, test_nan
     USE disp,                 ONLY: x_q, num_k_pts
     USE driver,               ONLY: calculation
     USE ener,                 ONLY: ef
     USE fft6_module,          ONLY: fft_map_generate
-    USE freqbins_module,      ONLY: freqbins_type
     USE gvect,                ONLY: mill
     USE gw_data,              ONLY: var_corr
     USE io_files,             ONLY: prefix
@@ -145,38 +144,16 @@ CONTAINS
     USE mp_pools,             ONLY: inter_pool_comm, root_pool, me_pool
     USE output_mod,           ONLY: filcoul
     USE parallel_module,      ONLY: mp_root_sum
-    USE select_solver_module, ONLY: select_solver_type
-    USE setup_nscf_module,    ONLY: sigma_config_type
-    USE sigma_grid_module,    ONLY: sigma_grid_type
     USE symm_base,            ONLY: nsym, s, invs, ftau, nrot
     USE timing_module,        ONLY: time_sigma_c, time_sigma_setup, &
                                     time_sigma_io, time_sigma_comm
-    USE truncation_module,    ONLY: vcut_type
-    USE units_gw,             ONLY: iuncoul, lrcoul, iunsigma, lrsigma
+    USE units_gw,             ONLY: iuncoul, lrcoul
 
     !> index of the k-point for which the self energy is evaluated
     INTEGER, INTENT(IN) :: ikpt
 
     !> Stores the data produced by the GW calculation
     TYPE(calculation), INTENT(INOUT) :: calc
-
-    !> the FFT grids used for the Fourier transformation
-    TYPE(sigma_grid_type), INTENT(IN) :: grid
-
-    !> the configuration of the linear solver for the Green's function
-    TYPE(select_solver_type), INTENT(IN) :: config_green
-
-    !> type containing the information about the frequencies used for the integration
-    TYPE(freqbins_type), INTENT(IN) :: freq
-
-    !> the truncated Coulomb potential
-    TYPE(vcut_type), INTENT(IN) :: vcut
-
-    !> evaluate the self-energy for these configurations
-    TYPE(sigma_config_type), INTENT(IN) :: config(:)
-
-    !> the debug configuration of the calculation
-    TYPE(debug_type), INTENT(IN) :: debug
 
     TYPE(element_type) element
 
@@ -233,9 +210,6 @@ CONTAINS
     !> name of file in which the Coulomb interaction is store
     CHARACTER(:), ALLOCATABLE :: filename
 
-    !> record in which the result are written
-    INTEGER irec
-
     !> counter on the frequencies
     INTEGER ifreq
 
@@ -255,16 +229,16 @@ CONTAINS
     WRITE(stdout, '(5x, a, 3f8.4, a)') 'evaluate self energy for k = (', xk(:, ikpt), ' )'
 
     ! set helper variable
-    num_g_corr  = grid%corr_fft%ngm
-    num_gp_corr = grid%corr_par_fft%ngm
-    debug_sigma = debug_set .AND. debug%sigma_corr
-    CALL fft_map_generate(grid%corr_par_fft, mill, fft_map)
+    num_g_corr  = calc%grid%corr_fft%ngm
+    num_gp_corr = calc%grid%corr_par_fft%ngm
+    debug_sigma = debug_set .AND. calc%debug%sigma_corr
+    CALL fft_map_generate(calc%grid%corr_par_fft, mill, fft_map)
 
     !
     ! set the prefactor depending on whether we integrate along the real or
     ! the imaginary frequency axis
     !
-    IF (freq%imag_sigma) THEN
+    IF (calc%freq%imag_sigma) THEN
       prefactor = CMPLX(-1.0_dp / (tpi * REAL(nsym, KIND=dp)), 0.0_dp, KIND=dp)
     ELSE
       prefactor = CMPLX(0.0_dp, 1.0_dp / (tpi * REAL(nsym, KIND=dp)), KIND=dp)
@@ -300,7 +274,7 @@ CONTAINS
     !
     ! initialize self energy
     !
-    ALLOCATE(sigma(num_g_corr, num_gp_corr, freq%num_sigma()))
+    ALLOCATE(sigma(num_g_corr, num_gp_corr, calc%freq%num_sigma()))
     sigma = zero
 
     !
@@ -321,23 +295,23 @@ CONTAINS
     iq = 0
     !
     ! allocate array for the coulomb matrix
-    ALLOCATE(coulomb(num_g_corr, num_g_corr, freq%num_freq()))
+    ALLOCATE(coulomb(num_g_corr, num_g_corr, calc%freq%num_freq()))
 
     !
     ! sum over all q-points
     !
-    DO icon = 1, SIZE(config)
+    DO icon = 1, SIZE(calc%config)
       !
-      WRITE(stdout, '(5x,a,3f8.4,a)', ADVANCE='NO') 'k + q = (', xk(:,config(icon)%index_kq), ' )'
+      WRITE(stdout, '(5x,a,3f8.4,a)', ADVANCE='NO') 'k + q = (', xk(:,calc%config(icon)%index_kq), ' )'
       !
       ! evaluate the coefficients for the analytic continuation of W
       !
-      IF (config(icon)%index_q /= iq) THEN
+      IF (calc%config(icon)%index_q /= iq) THEN
         !
-        iq = config(icon)%index_q
+        iq = calc%config(icon)%index_q
         CALL davcio(coulomb, lrcoul, iuncoul, iq, -1)
-        CALL coulpade(x_q(:,iq), vcut, coulomb)
-        CALL analytic_coeff(model_coul, tr2_gw, freq, coulomb)
+        CALL coulpade(x_q(:,iq), calc%vcut, coulomb)
+        CALL analytic_coeff(model_coul, tr2_gw, calc%freq, coulomb)
         !
         ! check if any NaN occured in coulpade
         IF (debug_sigma) THEN
@@ -350,14 +324,14 @@ CONTAINS
       !
       ! determine the prefactor
       !
-      alpha = config(icon)%weight * prefactor
+      alpha = calc%config(icon)%weight * prefactor
       !
       ! evaluate Sigma
       !
-      CALL sigma_correlation(omega, grid, config_green,                 &
-                             mu, alpha, config(icon)%index_kq, freq,    &
-                             gmapsym(:, config(icon)%sym_op), &
-                             coulomb, sigma, debug)
+      CALL sigma_correlation(omega, calc%grid, calc%config_green,  &
+                             mu, alpha, calc%config(icon)%index_kq, calc%freq, &
+                             gmapsym(:, calc%config(icon)%sym_op), &
+                             coulomb, sigma, calc%debug)
       !
     END DO ! icon
 
@@ -376,7 +350,7 @@ CONTAINS
     ! unpack sigma in the large array
     IF (me_pool == root_pool) THEN
       !
-      ALLOCATE(sigma_root(num_g_corr, num_g_corr, freq%num_sigma(), 1), STAT = ierr)
+      ALLOCATE(sigma_root(num_g_corr, num_g_corr, calc%freq%num_sigma(), 1), STAT = ierr)
       IF (ierr /= 0) THEN
         CALL errore(__FILE__, "error allocating array to collect sigma", ierr)
         RETURN
@@ -384,7 +358,7 @@ CONTAINS
       !
       sigma_root = zero
       !
-      DO ifreq = 1, freq%num_sigma()
+      DO ifreq = 1, calc%freq%num_sigma()
         sigma_root(:, fft_map, ifreq, 1) = sigma(:,:,ifreq)
       END DO
       !
@@ -400,14 +374,9 @@ CONTAINS
     ! the root process writes sigma to file
     !
     CALL start_clock(time_sigma_io)
-    CALL calc%data%write_dimension(var_corr, [num_g_corr, num_g_corr, freq%num_sigma(), num_k_pts], ierr)
+    CALL calc%data%write_dimension(var_corr, [num_g_corr, num_g_corr, calc%freq%num_sigma(), num_k_pts], ierr)
     CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
     IF (meta_ionode .AND. ALLOCATED(sigma_root)) THEN
-      !
-      DO ifreq = 1, freq%num_sigma()
-        irec = (ikpt - 1) * freq%num_sigma() + ifreq
-        CALL davcio(sigma_root(:,:,ifreq, 1), lrsigma, iunsigma, irec, 1)
-      END DO ! ifreq
       !
       element%variable = var_corr
       element%access_index = ikpt

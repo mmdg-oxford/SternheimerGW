@@ -61,8 +61,7 @@ PROGRAM gw
          CALL run_nscf(do_band, do_matel, ik, calc%config)
          CALL initialize_gw(.FALSE.)
          CALL stop_clock(time_setup)
-         IF (do_sigma_c) CALL sigma_wrapper(ik, calc, calc%grid, calc%config_green, &
-           calc%freq, calc%vcut, calc%config, calc%debug)
+         IF (do_sigma_c) CALL sigma_wrapper(ik, calc)
 ! Calculation of EXCHANGE energy \Sigma^{x}_{k}= \sum_{q}G_{k}{v_{k-S^{-1}q}}:
          IF (do_sigma_exx) call exchange_wrapper(ik, calc)
 ! Calculation of Matrix Elements <n\k| V^{xc}, \Sigma^{x}, \Sigma^{c}(iw) |n\k>:
