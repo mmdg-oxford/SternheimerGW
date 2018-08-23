@@ -20,15 +20,17 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-SUBROUTINE sigma_matel(ik0, grid, freq)
+SUBROUTINE sigma_matel(ik0, calc, grid, freq)
 
   USE buffers,              ONLY : get_buffer, close_buffer
   USE buiol,                ONLY : buiol_check_unit
   USE cell_base,            ONLY : tpiba2
   USE constants,            ONLY : RYTOEV, eps14
+  USE container_interface,  ONLY : element_type
   USE control_gw,           ONLY : do_imag
   USE control_lr,           ONLY : lgamma
-  USE disp,                 ONLY : xk_kpoints
+  USE disp,                 ONLY : xk_kpoints, num_k_pts
+  USE driver,               ONLY : calculation
   USE ener,                 ONLY : ef
   USE fft_base,             ONLY : dffts, dfftp
   USE fft_interfaces,       ONLY : invfft, fwfft
@@ -36,6 +38,7 @@ SUBROUTINE sigma_matel(ik0, grid, freq)
   USE freqbins_module,      ONLY : freqbins_type
   USE gvect,                ONLY : ngm, g, gl, igtongl
   USE gvecw,                ONLY : ecutwfc
+  USE gw_data,              ONLY : var_exch, var_corr
   USE gwsigma,              ONLY : nbnd_sig, corr_conv, exch_conv, ecutsco, ecutsex
   USE io_files,             ONLY : diropn 
   USE io_global,            ONLY : stdout, meta_ionode
@@ -48,7 +51,7 @@ SUBROUTINE sigma_matel(ik0, grid, freq)
   USE output_mod,           ONLY : filsigx, filsigc
   USE qpoint,               ONLY : npwq
   USE scf,                  ONLY : rho, rho_core, rhog_core, scf_type, v
-  USE sigma_expect_mod,     ONLY : sigma_expect, sigma_expect_file
+  USE sigma_expect_mod,     ONLY : sigma_expect_after_wavef_ordering
   USE sigma_grid_module,    ONLY : sigma_grid_type
   USE timing_module,        ONLY : time_matel
   USE units_gw,             ONLY : iunsigma, iuwfc, lrwfc, lrsigma, lrsex, iunsex
@@ -57,25 +60,26 @@ SUBROUTINE sigma_matel(ik0, grid, freq)
 
 IMPLICIT NONE
 
+  !> the data of the GW calculation
+  TYPE(calculation), INTENT(INOUT) :: calc
+
   !> the FFT grid used
   TYPE(sigma_grid_type), INTENT(IN) :: grid
 
   !> the frequency grid used
   TYPE(freqbins_type),   INTENT(IN) :: freq
 
-  COMPLEX(DP), ALLOCATABLE  :: sigma_band_con(:,:,:)
+  TYPE(element_type) element
+
+  COMPLEX(DP), ALLOCATABLE  :: sigma_band_con(:,:,:), sigma_band_x(:,:,:), sigma_band_c(:,:,:)
   COMPLEX(DP)               :: psic(dffts%nnr), vpsi(ngm)
-  COMPLEX(DP)               :: ZdoTC, sigma_band_c(nbnd_sig, nbnd_sig, nwsigma),&
-                               sigma_band_x(nbnd_sig, nbnd_sig, 1), vxc(nbnd_sig,nbnd_sig)
+  COMPLEX(DP)               :: ZdoTC, vxc(nbnd_sig,nbnd_sig)
   REAL(DP)                  :: vtxc, etxc
   INTEGER                   :: igk(npwx), ikq
-  INTEGER                   :: ig, ibnd, jbnd, ipol, ik0, ir
+  INTEGER                   :: ig, ibnd, jbnd, ipol, ik0, ir, ierr
   INTEGER                   :: ng
   INTEGER                   :: sigma_c_ngm, sigma_x_ngm
   LOGICAL                   :: exst, opnd
-
-  !> used to check nonzero file size
-  INTEGER(i8b) file_size
 
   !> energy of the highest occupied state
   REAL(dp) ehomo
@@ -124,12 +128,8 @@ IMPLICIT NONE
 
   WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ik0, (xk_kpoints(ipol,ik0) , ipol = 1, 3)
   WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikq, (xk(ipol,ikq) , ipol = 1, 3)
-
   ! set matrix elements to 0
   vxc          = 0
-  sigma_band_x = 0
-  sigma_band_c = 0
-
   ! create map to G ordering at current k-point
   CALL gk_sort( xk(1,ikq), ngm, g, ( ecutwfc / tpiba2 ),&
                 npw, igk, g2kin )
@@ -145,7 +145,6 @@ IMPLICIT NONE
   ! generate v_xc(r) in real space:
   v%of_r = 0
   CALL v_xc( rho, rho_core, rhog_core, etxc, vtxc, v%of_r )
-
   ! loop over all bands
   DO jbnd = 1, nbnd_sig
 
@@ -182,9 +181,11 @@ IMPLICIT NONE
   !
   ! expectation value of Sigma_x
   !
-  ! open file containing exchange part of sigma
-  INQUIRE( UNIT=iunsex, OPENED=opnd )
-  IF (.NOT. opnd) CALL diropn( iunsex, filsigx, lrsex, exst )
+  ! read exchange self energy
+  element%variable = var_exch
+  element%access_index = ik0
+  CALL calc%data%read_element(element, ierr)
+  CALL errore(__FILE__, "Reading exchange self energy failed", ierr)
 
   ! sanity check
   IF (ABS(exch_conv - ecutsex) < eps14 .OR. &
@@ -198,19 +199,18 @@ IMPLICIT NONE
     CALL errore("sigma_matel", "Exch Conv must be greater than zero and less than ecutsex", 1)
   END IF
 
-  ! check file size is not zero
-  INQUIRE(UNIT = iunsex, SIZE = file_size)
-
   ! evaluate matrix elements for exchange
-  IF (file_size /= 0) CALL sigma_expect_file(iunsex,ik0,evc,sigma_x_ngm,igk,sigma_band_x)
+  CALL sigma_expect_after_wavef_ordering(calc%data%exch,evc,igk,sigma_band_x)
 
   !
   ! expectation value of Sigma_c:
   !
 
   ! open file containing correlation part of sigma
-  INQUIRE( UNIT=iunsigma, OPENED=opnd )
-  IF (.NOT. opnd) CALL diropn( iunsigma, filsigc, lrsigma, exst )
+  element%variable = var_corr
+  element%access_index = ik0
+  CALL calc%data%read_element(element, ierr)
+  CALL errore(__FILE__, "Reading correlation self energy failed", ierr)
 
   ! For convergence tests corr_conv can be set at input lower than ecutsco.
   ! This allows you to calculate the correlation energy at lower energy cutoffs
@@ -224,11 +224,8 @@ IMPLICIT NONE
     CALL errore("sigma_matel", "Corr Conv must be greater than zero and less than ecutsco", 1)
   END IF
 
-  ! check file size is not zero
-  INQUIRE(UNIT = iunsigma, SIZE = file_size)
-
   ! evaluate expectation value of wave function
-  IF (file_size /= 0) CALL sigma_expect_file(iunsigma,ik0,evc,sigma_c_ngm,igk,sigma_band_c,nwsigma)
+  CALL sigma_expect_after_wavef_ordering(calc%data%corr(:,:,:,1),evc,igk,sigma_band_c)
 
   !
   ! analytic continuation from imaginary frequencies to real ones
@@ -248,6 +245,7 @@ IMPLICIT NONE
     CALL print_matel(ikq, vxc(1,1), sigma_band_x(1,1,1), sigma_band_c(1,1,1), REAL(freq%sigma) + mu, nwsigma)
   END IF
 
+  DEALLOCATE(calc%data%exch, calc%data%corr)
   CALL stop_clock(time_matel)
 
 END SUBROUTINE sigma_matel

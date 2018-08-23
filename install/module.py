@@ -92,7 +92,7 @@ structure = {
     depend: ["base", "pw", "util", "data", "algo"],
   },
   "matrix_el": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
   },  
   "postproc": {
     depend: ["base", "vendor", "algo"],

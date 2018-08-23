@@ -38,86 +38,49 @@ MODULE sigma_expect_mod
 
 CONTAINS
 
-  !> evaluate matrix elements of \f$\Sigma\f$ stored on file
+  !> evaluate matrix elements of \f$\Sigma\f$ after ordering the wave function
   !!
-  !! For a given set of wave functions, read the corresponding \f$\Sigma\f$ from the
-  !! specified file and evaluate the matrix elements with it
-  !! \param iunit unit pointing to the file in which \f$\Sigma\f$ is stored
-  !! \param irec record which contains \f$\Sigma\f$
+  !! Reorder the wave function according to a given map and evaluate expectation
+  !! value with given self energy \f$\Sigma\f$.
+  !! \param sigma self energy matrix
   !! \param wavef multiple wave functions for which the expectation value is computed
-  !! \param ngm maximum G allowed
   !! \param igk map from G's to local k-point
   !! \param matel output the resulting matrix elements
-  !! \param ndim third array dimension (optional: default = 1)
-  SUBROUTINE sigma_expect_file(iunit,irec,wavef,ngm,igk,matel,ndim)
+  SUBROUTINE sigma_expect_after_wavef_ordering(sigma,wavef,igk,matel)
 
     USE reorder_mod, ONLY : reorder, create_map
 
-    INTEGER,           INTENT(IN)  :: iunit
-    INTEGER,           INTENT(IN)  :: irec
-    COMPLEX(dp),       INTENT(IN)  :: wavef(:,:)
-    INTEGER,           INTENT(IN)  :: ngm
-    INTEGER,           INTENT(IN)  :: igk(:)
-    COMPLEX(dp),       INTENT(OUT) :: matel(:,:,:)
-    INTEGER, OPTIONAL, INTENT(IN)  :: ndim
+    COMPLEX(dp), INTENT(IN) :: sigma(:,:,:)
+    COMPLEX(dp), INTENT(IN) :: wavef(:,:)
+    INTEGER,     INTENT(IN) :: igk(:)
+    COMPLEX(dp), INTENT(OUT), ALLOCATABLE :: matel(:,:,:)
 
-    INTEGER ndim_loc
     INTEGER iloc
     INTEGER irec_loc
 
     INTEGER,     ALLOCATABLE :: map(:)
-    COMPLEX(dp), ALLOCATABLE :: wavef_ordered(:,:), sigma(:,:,:)
+    COMPLEX(dp), ALLOCATABLE :: wavef_ordered(:,:)
 
-    ! use ndim or default to 1
-    IF ( PRESENT(ndim) ) THEN
-      ndim_loc = ndim
-    ELSE
-      ndim_loc = 1
-    END IF
-
-    ! test array sizes
-    CALL errore("sigma_expect_mod->sigma_expect_file", "array size mismatch", &
-                size(matel) /= size(wavef,2)**2 * ndim_loc)
-
-    !
-    ! read sigma from file
-    !
-
-    ! allocate array to contain sigma
-    ALLOCATE( sigma(ngm,ngm,ndim_loc) )
-
-    ! read from file (factor 2 for complex)
-    DO iloc = 1, ndim_loc
-      irec_loc = (irec - 1) * ndim_loc + iloc
-      CALL davcio( sigma(:,:,iloc), 2*ngm*ngm, iunit, irec_loc, -1 )
-    END DO ! iloc
-
-    !
-    ! reorder wave function
-    !
+    ! check self energy is square matrix
+    IF (SIZE(sigma, 1) /= SIZE(sigma, 2)) &
+      CALL errore(__FILE__, "self energy is not a square matrix", 1)
 
     ! create copy of wavef
-    ALLOCATE( wavef_ordered(SIZE(wavef,1),SIZE(wavef,2)) )
+    ALLOCATE(wavef_ordered(SIZE(wavef,1),SIZE(wavef,2)))
     wavef_ordered = wavef
 
     ! create map to order wavef
-    ALLOCATE( map(size(igk)) )
-    map = create_map(igk,ngm)
+    ALLOCATE(map(size(igk)))
+    map = create_map(igk, SIZE(sigma, 1))
 
     ! reorder wavef so that it is compatible with igk
-    CALL reorder(wavef_ordered,map)
+    CALL reorder(wavef_ordered, map)
     
-    !
     ! evaluate the expectation value
-    !
-    matel = sigma_expect( sigma, wavef_ordered(:ngm,:) )
+    ALLOCATE(matel(SIZE(wavef, 2), SIZE(wavef, 2), SIZE(sigma, 3)))
+    matel = sigma_expect(sigma, wavef_ordered(:SIZE(sigma, 1),:))
 
-    ! deallocate arrays
-    DEALLOCATE( sigma )
-    DEALLOCATE( wavef_ordered )
-    DEALLOCATE( map )
-
-  END SUBROUTINE sigma_expect_file
+  END SUBROUTINE sigma_expect_after_wavef_ordering
 
   !> Evaluate expectation value of \f$\Sigma\f$ for single wave function.
   !!
