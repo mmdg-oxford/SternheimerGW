@@ -131,7 +131,7 @@ then
   num_line=100
 
   # read DFT eigenvalues
-  data=$(grep -A$num_line 'LDA eigenval (eV)' $fname | grep -B$num_line 'GWKpoint cart' | head -n -1)
+  data=$(grep -A$num_line 'LDA eigenval (eV)' $fname | grep -B$num_line 'GW qp energy (eV)' | head -n -1)
   dft_eval=$(echo "$data" | awk '{ for ( i = 4; i <= NF; i++ ) { print $i } }')
 
   # read the QP eigenvalues

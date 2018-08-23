@@ -7,6 +7,9 @@ on develop
 Include new container I/O library to replace the use of the deprecated
 IOTK library.
 
+Update output of GW calculation to have a higher precision and be more
+consistent.
+
 > compatible QE commit 5d111a0
 
 Version 0.15

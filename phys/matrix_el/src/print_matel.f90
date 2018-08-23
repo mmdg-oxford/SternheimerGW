@@ -50,6 +50,7 @@ real(DP)                  ::   resig_diag_tr(nwsigma), imsig_diag_tr(nwsigma), a
 integer                   ::   iw, ibnd, jbnd
 integer                   ::   iman, nman, ndeg(nbnd_sig), ideg, ikq
 logical                   ::   single_line
+character(:), allocatable ::   format_string
 
      one   = 1.0d0 
      czero = (0.0d0, 0.0d0)
@@ -124,138 +125,44 @@ logical                   ::   single_line
     enddo
   enddo
 
-  if(nbnd_sig.le.8) single_line=.true.
-  if(nbnd_sig.gt.8) single_line=.false.
-
   xkcryst(:) = xk(:, ikq)
-  call cryst_to_cart(1, xkcryst, at, -1)
-  if(single_line) then
-     write(stdout,'(/4x,"LDA eigenval (eV)", 8(1x,f7.2))')  et(1:nbnd_sig, ikq)*RYTOEV
-  else
-     !write(stdout,'(/4x,"LDA eigenval (eV)", 8(1x,f7.2))', advance='no')  et(1:8, ikq)*RYTOEV
-     write(stdout,'(/4x,"LDA eigenval (eV)", 8(1x,f7.2))')  et(1:8, ikq)*RYTOEV
-  endif
-  if(nbnd_sig.gt.8) then
-  do ideg = 9, nbnd_sig, 8 
-     !if(ideg+7.lt.nbnd_sig) write(stdout,9000, advance='no')  et(ideg:ideg+7, ikq)*RYTOEV
-     if(ideg+7.lt.nbnd_sig) write(stdout,9000)  et(ideg:ideg+7, ikq)*RYTOEV
-     if(ideg+7.ge.nbnd_sig) write(stdout,9000)  et(ideg:nbnd_sig, ikq)*RYTOEV
-  enddo
-  endif
+  CALL cryst_to_cart(1, xkcryst, at, -1)
+  WRITE(stdout,'(/,5x,"GWKpoint cart :", 3(1x,f8.4))') xk(:,ikq)
+  WRITE(stdout,'(5x,"GWKpoint cryst:", 3(1x,f8.4),/)') xkcryst(:)
 
-  write(stdout,'(/4x,"GWKpoint cart :", 3(1x,f8.4))') xk(:,ikq)
-  write(stdout,'(/4x,"GWKpoint cryst:", 3(1x,f8.4))') xkcryst(:)
+  single_line = (nbnd_sig <= 8)
+  IF (single_line) THEN
+    format_string = "(5x,a17,8f9.3)"
+  ELSE
+    format_string = "(5x,a17,8f9.3,/,(22x,8f9.3))"
+  END IF
+  WRITE(stdout,format_string) "LDA eigenval (eV)", et(:, ikq) * RYTOEV
+  WRITE(stdout,format_string) "GW qp energy (eV)", et_qp * RYTOEV
+  WRITE(stdout,format_string) "Vxc expt val (eV)", vxc_diag * RYTOEV
+  WRITE(stdout,format_string) "Sigma_ex val (eV)", sigma_ex_diag * RYTOEV
+  WRITE(stdout,format_string) "QP renorm        ", z
 
-  if(single_line) then
-     write(stdout, '(4x,"GW qp energy (eV)",8(1x,f7.2))')  et_qp(1:nbnd_sig)*RYTOEV
-  else
-     !write(stdout, '(4x,"GW qp energy (eV)",8(1x,f7.2))', advance='no')  et_qp(1:8)*RYTOEV
-     write(stdout, '(/4x,"GW qp energy (eV)",8(1x,f7.2))')  et_qp(1:8)*RYTOEV
-  endif
-
-  if(nbnd_sig.gt.8) then
-  do ideg = 9, nbnd_sig, 8 
-     !if(ideg+7.lt.nbnd_sig) write(stdout,9000, advance='no') et_qp(ideg:ideg+7)*RYTOEV
-     if(ideg+7.lt.nbnd_sig) write(stdout,9000) et_qp(ideg:ideg+7)*RYTOEV
-     if(ideg+7.ge.nbnd_sig) write(stdout,9000)  et_qp(ideg:nbnd_sig)*RYTOEV
-  enddo
-  endif
-
-  if(single_line) then
-     write(stdout,'(4x,"Vxc expt val (eV)",8(1x,f7.2))')  vxc_diag(1:nbnd_sig)*RYTOEV
-  else
-     !write(stdout,'(4x,"Vxc expt val (eV)",8(1x,f7.2))', advance='no')  vxc_diag(1:8)*RYTOEV
-     write(stdout,'(/4x,"Vxc expt val (eV)",8(1x,f7.2))')  vxc_diag(1:8)*RYTOEV
-  endif
-
-  if(nbnd_sig.gt.8) then
-  do ideg = 9, nbnd_sig, 8 
-     !if(ideg+7.lt.nbnd_sig) write(stdout,9000, advance='no')  vxc_diag(ideg:ideg+7)*RYTOEV
-     if(ideg+7.lt.nbnd_sig) write(stdout,9000)  vxc_diag(ideg:ideg+7)*RYTOEV
-     if(ideg+7.ge.nbnd_sig) write(stdout,9000)  vxc_diag(ideg:nbnd_sig)*RYTOEV
-  enddo
-  endif
-
-  if(single_line) then
-     write(stdout,'(4x,"Sigma_ex val (eV)",8(1x,f7.2))')  sigma_ex_diag(1:nbnd_sig)*RYTOEV
-  else
-     !write(stdout,'(4x,"Sigma_ex val (eV)",8(1x,f7.2))', advance='no')  sigma_ex_diag(1:8)*RYTOEV
-     write(stdout,'(/4x,"Sigma_ex val (eV)",8(1x,f7.2))')  sigma_ex_diag(1:8)*RYTOEV
-  endif
-
-  if(nbnd_sig.gt.8) then
-  do ideg = 9, nbnd_sig, 8 
-     !if(ideg+7.lt.nbnd_sig) write(stdout,9000, advance='no')  sigma_ex_diag(ideg:ideg+7)*RYTOEV
-     if(ideg+7.lt.nbnd_sig) write(stdout,9000)  sigma_ex_diag(ideg:ideg+7)*RYTOEV
-     if(ideg+7.ge.nbnd_sig) write(stdout,9000)  sigma_ex_diag(ideg:nbnd_sig)*RYTOEV
-  enddo
-  endif
-
-  if(single_line) then
-     write(stdout,'(4x,"QP renorm",8x, 8(1x,f7.2))')  z(1:nbnd_sig)
-  else
-     !write(stdout,'(4x,"QP renorm",8x, 8(1x,f7.2))', advance='no')  z(1:8)
-     write(stdout,'(/4x,"QP renorm",8x, 8(1x,f7.2))')  z(1:8)
-  endif
-
-  if(nbnd_sig.gt.8) then
-  do ideg = 9, nbnd_sig, 8 
-     !if(ideg+7.lt.nbnd_sig) write(stdout,9000, advance='no')  z(ideg:ideg+7)
-     if(ideg+7.lt.nbnd_sig) write(stdout,9000)  z(ideg:ideg+7)
-     if(ideg+7.ge.nbnd_sig) write(stdout,9000)  z(ideg:nbnd_sig)
-  enddo
-  endif
-
-  write(stdout,*)
-  write(stdout,'("REsigma")')
-  do iw = 1, nwsigma
-    if(single_line) then
-       write(stdout,'(9f14.7)') wsigma(iw), (RYTOEV*resig_diag (iw,ibnd), ibnd=1,nbnd_sig)
-    else
-       write(stdout,'(9f14.7)', advance='no') wsigma(iw), (RYTOEV*resig_diag (iw,ibnd), ibnd=1,8)
-    endif
-
-    if(nbnd_sig.gt.8) then
-    do ideg = 9, nbnd_sig, 8 
-       if(ideg+7.lt.nbnd_sig) write(stdout,9005,advance='no') (RYTOEV*resig_diag (iw,ideg:ideg+7)) 
-       if(ideg+7.ge.nbnd_sig) write(stdout,9005) (RYTOEV*resig_diag (iw,ideg:nbnd_sig)) 
-    enddo
-    endif
-  enddo
-
-  write(stdout,*)
-  write(stdout,'("IMsigma")')
-  do iw = 1, nwsigma
-     if(single_line) then
-        write(stdout,'(9f15.8)') wsigma(iw), (RYTOEV*imsig_diag (iw,ibnd), ibnd=1,nbnd_sig)
-     else
-        write(stdout,'(9f15.8)', advance='no') wsigma(iw), (RYTOEV*imsig_diag (iw,ibnd), ibnd=1,8)
-     endif
-     if(nbnd_sig.gt.8) then
-     do ideg = 9, nbnd_sig, 8
-        if(ideg+7.lt.nbnd_sig) write(stdout, 9005, advance='no') (RYTOEV*imsig_diag (iw,ibnd), ibnd=ideg,ideg+7)
-        if(ideg+7.ge.nbnd_sig) write(stdout, 9005) (RYTOEV*imsig_diag (iw,ibnd), ibnd=ideg,nbnd_sig)
-     enddo
-     endif
-  enddo
-
-  write(stdout,*)
-  write(stdout,'("ASpec")')
-  do iw = 1, nwsigma
-     if(single_line) then
-        write(stdout,'(9f15.8)') wsigma(iw), (a_diag (iw,ibnd)/RYTOEV,ibnd=1,nbnd_sig)
-     else
-        write(stdout,'(9f15.8)',advance='no') wsigma(iw), (a_diag (iw,ibnd)/RYTOEV, ibnd=1,8)
-     endif
-
-     if(nbnd_sig.gt.8) then
-     do ideg = 9, nbnd_sig, 8
-        if(ideg+7.lt.nbnd_sig) write(stdout, 9005,advance='no') (a_diag (iw,ibnd)/RYTOEV, ibnd=ideg,ideg+7)
-        if(ideg+7.ge.nbnd_sig) write(stdout, 9005) (a_diag (iw,ibnd)/RYTOEV, ibnd=ideg,nbnd_sig)
-     enddo
-     endif
-  enddo
-  write(stdout,*)
+  IF (single_line) THEN
+    format_string = "(1x,9f14.7)"
+  ELSE
+    format_string = "(1x,9f14.7,/,(15x,8f14.7))"
+  END IF
+  9000 FORMAT(6x,a)
+  WRITE(stdout,*)
+  WRITE(stdout,9000) "omega         REsigma"
+  DO iw = 1, nwsigma
+    WRITE(stdout,format_string) wsigma(iw), resig_diag(iw,:) * RYTOEV
+  END DO
+  WRITE(stdout,*)
+  WRITE(stdout,9000) "omega         IMsigma"
+  DO iw = 1, nwsigma
+    WRITE(stdout,format_string) wsigma(iw), imsig_diag(iw,:) * RYTOEV
+  END DO
+  WRITE(stdout,*)
+  WRITE(stdout,9000) "omega         ASpec"
+  DO iw = 1, nwsigma
+    WRITE(stdout,format_string) wsigma(iw), a_diag(iw,:) / RYTOEV
+  END DO
 
   !
   ! print output files according to user requirement
@@ -269,10 +176,7 @@ logical                   ::   single_line
   CALL pp_output_xml(output%pp_im_corr, ikq, xk(:,ikq), wsigma, imsig_diag * RYTOEV)
   CALL pp_output_xml(output%pp_spec,    ikq, xk(:,ikq), wsigma, a_diag / RYTOEV)
 
-  9000 format(21x, 8(1x,f7.2))
-  9005 format(8(1x,f14.7))
-RETURN
-end subroutine print_matel
+END SUBROUTINE print_matel
 
 !----------------------------------------------------------------
   SUBROUTINE  qp_eigval ( nw, w, sig, et, et_qp, z )

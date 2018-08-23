@@ -256,10 +256,6 @@ original eigenvalues outside the frequency range of the self-energy
 
 
     LDA eigenval (eV)   -7.79   14.32   14.32   14.32   19.79   19.79   19.79   27.14
-
-    GWKpoint cart :   0.0000   0.0000   0.0000
-
-    GWKpoint cryst:   0.0000   0.0000   0.0000
     GW qp energy (eV)    0.00   14.54   14.54   14.54    0.00    0.00    0.00    0.00
     Vxc expt val (eV)  -14.80  -16.76  -16.76  -16.76  -15.35  -15.35  -15.35  -16.15
     Sigma_ex val (eV)  -25.40  -20.27  -20.27  -20.27   -8.11   -8.11   -8.11   -7.02

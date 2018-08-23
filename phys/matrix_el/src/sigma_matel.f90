@@ -121,8 +121,8 @@ IMPLICIT NONE
      ikq = 2
   END IF
 
-  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikpt, xk_kpoints(:,ikpt)
-  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikq, xk(:,ikq)
+  WRITE(stdout,'(/,5x,"k     = (", 3f7.3, " )")') xk_kpoints(:,ikpt)
+  WRITE(stdout,'(5x,"k + q = (", 3f7.3, " )",/)') xk(:,ikq)
   ! set matrix elements to 0
   vxc          = 0
   ! create map to G ordering at current k-point
@@ -200,6 +200,7 @@ IMPLICIT NONE
 
   ELSE
 
+    WRITE(stdout, '(5x, a)') 'Exchange not read, set contribution to 0'
     ALLOCATE(sigma_band_x(nbnd_sig, nbnd_sig, 1))
     sigma_band_x = zero
 
@@ -233,6 +234,7 @@ IMPLICIT NONE
 
   ELSE
 
+    WRITE(stdout, '(5x, a)') 'Correlation not read, set contribution to 0'
     ALLOCATE(sigma_band_c(nbnd_sig, nbnd_sig, nwsigma))
     sigma_band_c = zero
 
