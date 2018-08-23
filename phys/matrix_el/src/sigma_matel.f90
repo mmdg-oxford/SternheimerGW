@@ -32,7 +32,7 @@ SUBROUTINE matrix_element(ikpt, calc)
   USE buiol,                ONLY : buiol_check_unit
   USE cell_base,            ONLY : tpiba2
   USE constants,            ONLY : RYTOEV, eps14
-  USE container_interface,  ONLY : element_type
+  USE container_interface,  ONLY : element_type, no_error
   USE control_gw,           ONLY : do_imag
   USE control_lr,           ONLY : lgamma
   USE disp,                 ONLY : xk_kpoints, num_k_pts
@@ -180,22 +180,30 @@ IMPLICIT NONE
   element%variable = var_exch
   element%access_index = ikpt
   CALL calc%data%read_element(element, ierr)
-  CALL errore(__FILE__, "Reading exchange self energy failed", ierr)
 
-  ! sanity check
-  IF (ABS(exch_conv - ecutsex) < eps14 .OR. &
-      ABS(exch_conv) < eps14) THEN
-    sigma_x_ngm = calc%grid%exch_fft%ngm
-  ELSE IF((exch_conv < ecutsex) .AND. (exch_conv > 0.0)) THEN
-    DO ng = 1, ngm
-       IF ( gl( igtongl (ng) ) <= (exch_conv/tpiba2)) sigma_x_ngm = ng
-    END DO
+  IF (ierr == no_error) THEN
+
+    ! sanity check
+    IF (ABS(exch_conv - ecutsex) < eps14 .OR. &
+        ABS(exch_conv) < eps14) THEN
+      sigma_x_ngm = calc%grid%exch_fft%ngm
+    ELSE IF((exch_conv < ecutsex) .AND. (exch_conv > 0.0)) THEN
+      DO ng = 1, ngm
+         IF ( gl( igtongl (ng) ) <= (exch_conv/tpiba2)) sigma_x_ngm = ng
+      END DO
+    ELSE
+      CALL errore("sigma_matel", "Exch Conv must be greater than zero and less than ecutsex", 1)
+    END IF
+
+    ! evaluate matrix elements for exchange
+    CALL sigma_expect_after_wavef_ordering(calc%data%exch,evc,igk,sigma_band_x)
+
   ELSE
-    CALL errore("sigma_matel", "Exch Conv must be greater than zero and less than ecutsex", 1)
-  END IF
 
-  ! evaluate matrix elements for exchange
-  CALL sigma_expect_after_wavef_ordering(calc%data%exch,evc,igk,sigma_band_x)
+    ALLOCATE(sigma_band_x(nbnd_sig, nbnd_sig, 1))
+    sigma_band_x = zero
+
+  END IF
 
   !
   ! expectation value of Sigma_c:
@@ -205,22 +213,30 @@ IMPLICIT NONE
   element%variable = var_corr
   element%access_index = ikpt
   CALL calc%data%read_element(element, ierr)
-  CALL errore(__FILE__, "Reading correlation self energy failed", ierr)
 
-  ! For convergence tests corr_conv can be set at input lower than ecutsco.
-  ! This allows you to calculate the correlation energy at lower energy cutoffs
-  IF (ABS(corr_conv - ecutsco) < eps14) THEN
-    sigma_c_ngm = calc%grid%corr_fft%ngm
-  ELSE IF(corr_conv < ecutsco .AND. corr_conv > 0.0) THEN
-    DO ng = 1, ngm
-      IF (gl( igtongl (ng) ) <= (corr_conv/tpiba2)) sigma_c_ngm = ng
-    END DO
+  IF (ierr == no_error) THEN
+
+    ! For convergence tests corr_conv can be set at input lower than ecutsco.
+    ! This allows you to calculate the correlation energy at lower energy cutoffs
+    IF (ABS(corr_conv - ecutsco) < eps14) THEN
+      sigma_c_ngm = calc%grid%corr_fft%ngm
+    ELSE IF(corr_conv < ecutsco .AND. corr_conv > 0.0) THEN
+      DO ng = 1, ngm
+        IF (gl( igtongl (ng) ) <= (corr_conv/tpiba2)) sigma_c_ngm = ng
+      END DO
+    ELSE
+      CALL errore("sigma_matel", "Corr Conv must be greater than zero and less than ecutsco", 1)
+    END IF
+
+    ! evaluate expectation value of wave function
+    CALL sigma_expect_after_wavef_ordering(calc%data%corr(:,:,:,1),evc,igk,sigma_band_c)
+
   ELSE
-    CALL errore("sigma_matel", "Corr Conv must be greater than zero and less than ecutsco", 1)
-  END IF
 
-  ! evaluate expectation value of wave function
-  CALL sigma_expect_after_wavef_ordering(calc%data%corr(:,:,:,1),evc,igk,sigma_band_c)
+    ALLOCATE(sigma_band_c(nbnd_sig, nbnd_sig, nwsigma))
+    sigma_band_c = zero
+
+  END IF
 
   !
   ! analytic continuation from imaginary frequencies to real ones
@@ -240,7 +256,8 @@ IMPLICIT NONE
     CALL print_matel(ikq, vxc, sigma_band_x, sigma_band_c, REAL(calc%freq%sigma) + mu, nwsigma)
   END IF
 
-  DEALLOCATE(calc%data%exch, calc%data%corr)
+  IF (ALLOCATED(calc%data%exch)) DEALLOCATE(calc%data%exch)
+  IF (ALLOCATED(calc%data%corr)) DEALLOCATE(calc%data%corr)
   CALL stop_clock(time_matel)
 
 END SUBROUTINE matrix_element
