@@ -201,9 +201,6 @@ CONTAINS
     !> the self-energy at the current k-point
     COMPLEX(dp), ALLOCATABLE :: sigma(:,:,:)
 
-    !> the self-energy at the current k-point collected on the root process
-    COMPLEX(dp), ALLOCATABLE :: sigma_root(:,:,:,:)
-
     !> number of bytes in a real
     INTEGER, PARAMETER   :: byte_real = 8
 
@@ -341,7 +338,6 @@ CONTAINS
     !
     ! collect sigma on a single process
     !
-    ! TODO replace this by parallel I/O
     CALL start_clock(time_sigma_comm)
 
     ! first sum sigma across the pool
@@ -350,19 +346,19 @@ CONTAINS
     ! unpack sigma in the large array
     IF (me_pool == root_pool) THEN
       !
-      ALLOCATE(sigma_root(num_g_corr, num_g_corr, calc%freq%num_sigma(), 1), STAT = ierr)
+      ALLOCATE(calc%data%corr(num_g_corr, num_g_corr, calc%freq%num_sigma(), 1), STAT = ierr)
       IF (ierr /= 0) THEN
         CALL errore(__FILE__, "error allocating array to collect sigma", ierr)
         RETURN
       END IF
       !
-      sigma_root = zero
+      calc%data%corr = zero
       !
       DO ifreq = 1, calc%freq%num_sigma()
-        sigma_root(:, fft_map, ifreq, 1) = sigma(:,:,ifreq)
+        calc%data%corr(:, fft_map, ifreq, 1) = sigma(:,:,ifreq)
       END DO
       !
-      CALL mp_root_sum(inter_image_comm, root_image, sigma_root(:,:,:,1))
+      CALL mp_root_sum(inter_image_comm, root_image, calc%data%corr(:,:,:,1))
       !
     END IF
 
@@ -376,16 +372,15 @@ CONTAINS
     CALL start_clock(time_sigma_io)
     CALL calc%data%write_dimension(var_corr, [num_g_corr, num_g_corr, calc%freq%num_sigma(), num_k_pts], ierr)
     CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
-    IF (meta_ionode .AND. ALLOCATED(sigma_root)) THEN
+    IF (meta_ionode .AND. ALLOCATED(calc%data%corr)) THEN
       !
       element%variable = var_corr
       element%access_index = ikpt
-      CALL MOVE_ALLOC(sigma_root, calc%data%corr)
       CALL calc%data%write_element(element, ierr)
       CALL errore(__FILE__, "Error writing correlation self energy", ierr)
-      DEALLOCATE(calc%data%corr)
       !
     END IF ! ionode
+    IF (ALLOCATED(calc%data%corr)) DEALLOCATE(calc%data%corr)
     CALL stop_clock(time_sigma_io)
 
     CALL stop_clock(time_sigma_c)
