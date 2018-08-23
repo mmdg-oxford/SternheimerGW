@@ -20,7 +20,13 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-SUBROUTINE sigma_matel(ik0, calc, grid, freq)
+MODULE sigma_matel
+
+  IMPLICIT NONE
+
+CONTAINS
+
+SUBROUTINE matrix_element(ikpt, calc)
 
   USE buffers,              ONLY : get_buffer, close_buffer
   USE buiol,                ONLY : buiol_check_unit
@@ -46,29 +52,19 @@ SUBROUTINE sigma_matel(ik0, calc, grid, freq)
   USE kinds,                ONLY : DP
   USE klist,                ONLY : xk, lgauss
   USE mp,                   ONLY : mp_bcast, mp_barrier, mp_sum
-  USE mp_images,            ONLY : my_image_id
-  USE mp_world,             ONLY : mpime
-  USE output_mod,           ONLY : filsigx, filsigc
   USE qpoint,               ONLY : npwq
   USE scf,                  ONLY : rho, rho_core, rhog_core, scf_type, v
   USE sigma_expect_mod,     ONLY : sigma_expect_after_wavef_ordering
-  USE sigma_grid_module,    ONLY : sigma_grid_type
   USE timing_module,        ONLY : time_matel
-  USE units_gw,             ONLY : iunsigma, iuwfc, lrwfc, lrsigma, lrsex, iunsex
+  USE units_gw,             ONLY : iuwfc, lrwfc
   USE wavefunctions,        ONLY : evc
   USE wvfct,                ONLY : nbnd, npw, npwx, g2kin
 
 IMPLICIT NONE
 
   !> the data of the GW calculation
+  INTEGER, INTENT(IN) :: ikpt
   TYPE(calculation), INTENT(INOUT) :: calc
-
-  !> the FFT grid used
-  TYPE(sigma_grid_type), INTENT(IN) :: grid
-
-  !> the frequency grid used
-  TYPE(freqbins_type),   INTENT(IN) :: freq
-
   TYPE(element_type) element
 
   COMPLEX(DP), ALLOCATABLE  :: sigma_band_con(:,:,:), sigma_band_x(:,:,:), sigma_band_c(:,:,:)
@@ -76,10 +72,9 @@ IMPLICIT NONE
   COMPLEX(DP)               :: ZdoTC, vxc(nbnd_sig,nbnd_sig)
   REAL(DP)                  :: vtxc, etxc
   INTEGER                   :: igk(npwx), ikq
-  INTEGER                   :: ig, ibnd, jbnd, ipol, ik0, ir, ierr
+  INTEGER                   :: ig, ibnd, jbnd, ir, ierr
   INTEGER                   :: ng
   INTEGER                   :: sigma_c_ngm, sigma_x_ngm
-  LOGICAL                   :: exst, opnd
 
   !> energy of the highest occupied state
   REAL(dp) ehomo
@@ -120,14 +115,14 @@ IMPLICIT NONE
   END IF
 
   ! check for gamma point
-  IF(ALL(ABS(xk_kpoints(:,ik0)) <= eps14)) THEN
+  IF(ALL(ABS(xk_kpoints(:,ikpt)) <= eps14)) THEN
      ikq = 1
   ELSE
      ikq = 2
   END IF
 
-  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ik0, (xk_kpoints(ipol,ik0) , ipol = 1, 3)
-  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikq, (xk(ipol,ikq) , ipol = 1, 3)
+  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikpt, xk_kpoints(:,ikpt)
+  WRITE(stdout,'(/4x,"k0(",i3," ) = (", 3f7.3, " )")') ikq, xk(:,ikq)
   ! set matrix elements to 0
   vxc          = 0
   ! create map to G ordering at current k-point
@@ -183,14 +178,14 @@ IMPLICIT NONE
   !
   ! read exchange self energy
   element%variable = var_exch
-  element%access_index = ik0
+  element%access_index = ikpt
   CALL calc%data%read_element(element, ierr)
   CALL errore(__FILE__, "Reading exchange self energy failed", ierr)
 
   ! sanity check
   IF (ABS(exch_conv - ecutsex) < eps14 .OR. &
       ABS(exch_conv) < eps14) THEN
-    sigma_x_ngm = grid%exch_fft%ngm
+    sigma_x_ngm = calc%grid%exch_fft%ngm
   ELSE IF((exch_conv < ecutsex) .AND. (exch_conv > 0.0)) THEN
     DO ng = 1, ngm
        IF ( gl( igtongl (ng) ) <= (exch_conv/tpiba2)) sigma_x_ngm = ng
@@ -208,14 +203,14 @@ IMPLICIT NONE
 
   ! open file containing correlation part of sigma
   element%variable = var_corr
-  element%access_index = ik0
+  element%access_index = ikpt
   CALL calc%data%read_element(element, ierr)
   CALL errore(__FILE__, "Reading correlation self energy failed", ierr)
 
   ! For convergence tests corr_conv can be set at input lower than ecutsco.
   ! This allows you to calculate the correlation energy at lower energy cutoffs
   IF (ABS(corr_conv - ecutsco) < eps14) THEN
-    sigma_c_ngm = grid%corr_fft%ngm
+    sigma_c_ngm = calc%grid%corr_fft%ngm
   ELSE IF(corr_conv < ecutsco .AND. corr_conv > 0.0) THEN
     DO ng = 1, ngm
       IF (gl( igtongl (ng) ) <= (corr_conv/tpiba2)) sigma_c_ngm = ng
@@ -234,18 +229,20 @@ IMPLICIT NONE
     ! We can set arbitrary \Sigma(\omega) energy windows with analytic continuation:
     ALLOCATE (sigma_band_con(nbnd_sig, nbnd_sig, nwsigwin))
     ! print selfenergy on the imaginary axis.
-    CALL print_matel_im(ikq, vxc(1,1), sigma_band_x(1,1,1), sigma_band_c(1,1,1), AIMAG(freq%sigma), nwsigma)
+    CALL print_matel_im(ikq, vxc, sigma_band_x, sigma_band_c, AIMAG(calc%freq%sigma), nwsigma)
     ! do analytic continuation and print selfenergy on the real axis.
     sigma_band_con(:,:,:) = zero
-    CALL sigma_pade(sigma_band_c(1,1,1), sigma_band_con(1,1,1), mu, AIMAG(freq%sigma), freq%window, nwsigwin)
-    CALL print_matel(ikq, vxc(1,1), sigma_band_x(1,1,1), sigma_band_con(1,1,1), freq%window, nwsigwin)
+    CALL sigma_pade(sigma_band_c, sigma_band_con, mu, AIMAG(calc%freq%sigma), calc%freq%window, nwsigwin)
+    CALL print_matel(ikq, vxc, sigma_band_x, sigma_band_con, calc%freq%window, nwsigwin)
    deallocate(sigma_band_con)
   ELSE
     ! print sigma on real axis
-    CALL print_matel(ikq, vxc(1,1), sigma_band_x(1,1,1), sigma_band_c(1,1,1), REAL(freq%sigma) + mu, nwsigma)
+    CALL print_matel(ikq, vxc, sigma_band_x, sigma_band_c, REAL(calc%freq%sigma) + mu, nwsigma)
   END IF
 
   DEALLOCATE(calc%data%exch, calc%data%corr)
   CALL stop_clock(time_matel)
 
-END SUBROUTINE sigma_matel
+END SUBROUTINE matrix_element
+
+END MODULE sigma_matel

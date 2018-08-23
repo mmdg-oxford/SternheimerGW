@@ -20,7 +20,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-program gw
+PROGRAM gw
 !-----------------------------------------------------------------------
 !... This is the main driver of the SternheimerGW code.
 !-----------------------------------------------------------------------
@@ -36,6 +36,7 @@ program gw
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
   USE setup,                ONLY : setup_calculation
+  USE sigma_matel,          ONLY : matrix_element
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup
 
@@ -49,32 +50,32 @@ program gw
   CALL setup_calculation(calc)
 
 ! Calculation W
-  if(do_coulomb) call do_stern(calc%config_coul, calc%grid, calc%freq)
+  IF(do_coulomb) CALL do_stern(calc%config_coul, calc%grid, calc%freq)
   ik = 1
   do_band  = .TRUE.
   do_matel = .TRUE.
 ! Calculation of CORRELATION energy \Sigma^{c}_{k}=\sum_{q}G_{k-q}{W_{q}-v_{q}}:
-  if (.not.do_q0_only) then
-      do ik = w_of_k_start, w_of_k_stop
-         call start_clock(time_setup)
-         call run_nscf(do_band, do_matel, ik, calc%config)
-         call initialize_gw(.FALSE.)
-         call stop_clock(time_setup)
-         if (do_sigma_c) call sigma_wrapper(ik, calc, calc%grid, calc%config_green, &
+  IF (.NOT.do_q0_only) THEN
+      DO ik = w_of_k_start, w_of_k_stop
+         CALL start_clock(time_setup)
+         CALL run_nscf(do_band, do_matel, ik, calc%config)
+         CALL initialize_gw(.FALSE.)
+         CALL stop_clock(time_setup)
+         IF (do_sigma_c) CALL sigma_wrapper(ik, calc, calc%grid, calc%config_green, &
            calc%freq, calc%vcut, calc%config, calc%debug)
 ! Calculation of EXCHANGE energy \Sigma^{x}_{k}= \sum_{q}G_{k}{v_{k-S^{-1}q}}:
-         if (do_sigma_exx) call exchange_wrapper(ik, calc, calc%grid, calc%vcut)
+         IF (do_sigma_exx) call exchange_wrapper(ik, calc, calc%grid, calc%vcut)
 ! Calculation of Matrix Elements <n\k| V^{xc}, \Sigma^{x}, \Sigma^{c}(iw) |n\k>:
-         if (do_sigma_matel) then
-           if (meta_ionode .AND. ik == w_of_k_start) then         
+         IF (do_sigma_matel) then
+           IF (meta_ionode .AND. ik == w_of_k_start) then         
              call pp_output_open_all(num_k_pts, nbnd_sig, nwsigwin, nwsigma, output)
-           end if
-           call sigma_matel(ik, calc, calc%grid, calc%freq)
-         end if
-         call clean_pw_gw(.TRUE.)
-      enddo
-  end if
-  call close_gwq(.TRUE., calc%data)
-  call stop_gw( .TRUE. )
+           END IF
+           CALL matrix_element(ik, calc)
+         END IF
+         CALL clean_pw_gw(.TRUE.)
+      END DO
+  END IF
+  CALL close_gwq(.TRUE., calc%data)
+  CALL stop_gw(.TRUE.)
 
-end program gw
+END PROGRAM gw

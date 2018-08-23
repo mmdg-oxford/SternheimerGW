@@ -55,9 +55,6 @@ CONTAINS
     INTEGER,     INTENT(IN) :: igk(:)
     COMPLEX(dp), INTENT(OUT), ALLOCATABLE :: matel(:,:,:)
 
-    INTEGER iloc
-    INTEGER irec_loc
-
     INTEGER,     ALLOCATABLE :: map(:)
     COMPLEX(dp), ALLOCATABLE :: wavef_ordered(:,:)
 
