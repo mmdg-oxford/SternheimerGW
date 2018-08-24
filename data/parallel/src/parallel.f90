@@ -588,6 +588,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(size_out))
 
+    ELSE
+      ALLOCATE(displ(0), array_out(0))
+
     END IF
 
     ! gather everything at the root process
@@ -597,9 +600,7 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-    END IF
+    DEALLOCATE(displ)
 
 #else
 
@@ -682,6 +683,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(size_out))
 
+    ELSE
+      ALLOCATE(displ(0), array_out(0))
+
     END IF
 
     ! gather everything at the root process
@@ -691,9 +695,7 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-    END IF
+    DEALLOCATE(displ)
 
 #else
 
@@ -790,6 +792,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(SIZE(array_in, 1), size_out))
 
+    ELSE
+      ALLOCATE(receive(0), displ(0), array_out(0,0))
+
     END IF
 
     ! gather everything at the root process
@@ -798,10 +803,8 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-      DEALLOCATE(receive)
-    END IF
+    DEALLOCATE(displ)
+    DEALLOCATE(receive)
 
 #else
 
@@ -898,6 +901,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(SIZE(array_in, 1), size_out))
 
+    ELSE
+      ALLOCATE(receive(0), displ(0), array_out(0,0))
+
     END IF
 
     ! gather everything at the root process
@@ -906,10 +912,8 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-      DEALLOCATE(receive)
-    END IF
+    DEALLOCATE(displ)
+    DEALLOCATE(receive)
 
 #else
 
@@ -1011,6 +1015,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(SIZE(array_in, 1), SIZE(array_in, 2), size_out))
 
+    ELSE
+      ALLOCATE(receive(0), displ(0), array_out(0,0,0))
+
     END IF
 
     ! gather everything at the root process
@@ -1019,10 +1026,8 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-      DEALLOCATE(receive)
-    END IF
+    DEALLOCATE(displ)
+    DEALLOCATE(receive)
 
 #else
 
@@ -1124,6 +1129,9 @@ CONTAINS
       size_out = SUM(num_task)
       ALLOCATE(array_out(SIZE(array_in, 1), SIZE(array_in, 2), size_out))
 
+    ELSE
+      ALLOCATE(receive(0), displ(0), array_out(0,0,0))
+
     END IF
 
     ! gather everything at the root process
@@ -1132,10 +1140,8 @@ CONTAINS
                      root, comm, ierr)
     CALL errore(__FILE__, "error in mpi_gatherv call", ierr)
 
-    IF (my_rank == root) THEN
-      DEALLOCATE(displ)
-      DEALLOCATE(receive)
-    END IF
+    DEALLOCATE(displ)
+    DEALLOCATE(receive)
 
 #else
 
