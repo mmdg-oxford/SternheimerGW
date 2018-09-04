@@ -349,8 +349,6 @@ CONTAINS
     ! the root process writes sigma to file
     !
     CALL start_clock(time_sigma_io)
-    CALL calc%data%write_dimension(var_corr, [num_g_corr, num_g_corr, calc%freq%num_sigma(), num_k_pts], ierr)
-    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
     IF (meta_ionode .AND. ALLOCATED(calc%data%corr)) THEN
       !
       element%variable = var_corr

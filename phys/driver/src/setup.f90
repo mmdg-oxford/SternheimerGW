@@ -24,6 +24,9 @@ MODULE setup
 
   IMPLICIT NONE
 
+  PRIVATE
+  PUBLIC setup_calculation
+
 CONTAINS
 
   SUBROUTINE setup_calculation(calc)
@@ -61,8 +64,32 @@ CONTAINS
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
     CALL open_container(calc%data)
+    CALL write_dimension(calc)
     CALL stop_clock(time_setup)
     !
   END SUBROUTINE setup_calculation
+
+  SUBROUTINE write_dimension(calc)
+    !
+    USE control_gw,   ONLY: do_sigma_c, do_sigma_exx
+    USE driver,       ONLY: calculation
+    USE gw_container, ONLY: write_exch_dim, write_corr_dim
+    TYPE(calculation), INTENT(INOUT) :: calc
+    INTEGER num_g_vec, num_k_pts, num_omega
+    !
+    IF (do_sigma_c) THEN
+      num_g_vec = calc%grid%exch_fft%ngm
+      num_k_pts = SIZE(calc%data%k_point, 2)
+      CALL write_exch_dim(calc%data, [num_g_vec, num_g_vec, num_k_pts])
+    END IF
+    !
+    IF (do_sigma_exx) THEN
+      num_g_vec = calc%grid%corr_fft%ngm
+      num_omega = calc%freq%num_sigma()
+      num_k_pts = SIZE(calc%data%k_point, 2)
+      CALL write_corr_dim(calc%data, [num_g_vec, num_g_vec, num_omega, num_k_pts])
+    END IF
+    !
+  END SUBROUTINE write_dimension
 
 END MODULE setup

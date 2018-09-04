@@ -58,4 +58,28 @@ CONTAINS
     !
   END SUBROUTINE close_container
 
+  SUBROUTINE write_exch_dim(data, exch_dim)
+    !
+    USE gw_data, ONLY: gw_data_container, var_exch
+    TYPE(gw_data_container), INTENT(INOUT) :: data
+    INTEGER, INTENT(IN) :: exch_dim(:)
+    INTEGER ierr
+    !
+    CALL data%write_dimension(var_exch, exch_dim, ierr)
+    CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
+    !
+  END SUBROUTINE write_exch_dim
+
+  SUBROUTINE write_corr_dim(data, corr_dim)
+    !
+    USE gw_data, ONLY: gw_data_container, var_corr
+    TYPE(gw_data_container), INTENT(INOUT) :: data
+    INTEGER, INTENT(IN) :: corr_dim(:)
+    INTEGER ierr
+    !
+    CALL data%write_dimension(var_corr, corr_dim, ierr)
+    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
+    !
+  END SUBROUTINE write_corr_dim
+
 END MODULE gw_container

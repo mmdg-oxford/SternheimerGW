@@ -371,9 +371,6 @@ CONTAINS
     CALL errore(__FILE__, "error allocating array for exchange self energy", ierr)
     calc%data%exch = zero
 
-    CALL calc%data%write_dimension(var_exch, [calc%grid%exch_fft%ngm, calc%grid%exch_fft%ngm, num_k_pts], ierr)
-    CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
-
     !!
     !! 1. Extract the wave function of every q-point
     !!
