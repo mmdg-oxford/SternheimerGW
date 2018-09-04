@@ -1,0 +1,4 @@
+testSimple.o: ../f90_src/container.o
+testSimple.o: ../example/simple.o
+testTwoArray.o: ../f90_src/container.o
+testTwoArray.o: ../example/two_array.o

@@ -1,0 +1,120 @@
+! This Source Code Form is subject to the terms of the Mozilla Public
+! License, v. 2.0. If a copy of the MPL was not distributed with this
+! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+MODULE testComplex
+
+  USE pfunit_mod
+  USE container_interface
+  USE complex_array
+  IMPLICIT NONE
+
+CONTAINS
+
+  FUNCTION default_config(comm)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: comm
+    TYPE(configuration) :: default_config
+    !
+    default_config%communicator = comm
+    default_config%filename = 'complex.io'
+    default_config%mode = MPI_MODE_CREATE + MPI_MODE_RDWR
+    !
+  END FUNCTION default_config
+
+  SUBROUTINE set_reference(reference)
+    !
+    TYPE(complex_array_container), INTENT(INOUT) :: reference
+    INTEGER, PARAMETER :: first_dim = 5, second_dim = 9
+    INTEGER, PARAMETER :: third_dim = 7, fourth_dim = 8, fifth_dim = 3
+    INTEGER ii, jj, kk, counter
+    !
+    ALLOCATE(reference%single(first_dim, second_dim))
+    counter = 0
+    DO jj = 1, second_dim
+      DO ii = 1, first_dim
+        reference%single(ii, jj) = CMPLX(counter, SIZE(reference%single) - counter)
+        counter = counter + 1
+      END DO
+    END DO
+    ALLOCATE(reference%double(third_dim, fourth_dim, fifth_dim))
+    DO kk = 1, fifth_dim
+      DO jj = 1, fourth_dim
+        DO ii = 1, third_dim
+          reference%double(ii, jj, kk) = CMPLX(counter, SIZE(reference%double) - counter)
+          counter = counter + 1
+        END DO
+      END DO
+    END DO
+    !
+  END SUBROUTINE set_reference
+
+  SUBROUTINE write_reference(rank, reference)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: rank
+    TYPE(complex_array_container), INTENT(OUT) :: reference
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    IF (rank == 0) THEN
+      config = default_config(MPI_COMM_SELF)
+      CALL reference%open(config, ierr)
+      CALL set_reference(reference)
+      CALL reference%write(ierr)
+      @assertEqual(no_error, ierr)
+      CALL reference%close(ierr)
+    ELSE
+      CALL set_reference(reference)
+    END IF
+    !
+  END SUBROUTINE write_reference
+
+  @test(npes=[1])
+  SUBROUTINE test_read_container(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(complex_array_container) ref, sample
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    CALL write_reference(this%getProcessRank(), ref)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    CALL sample%read(ierr)
+    CALL sample%close(ierr)
+    @assertEqual(no_error, ierr)
+    @assertEqual(ref%single, sample%single)
+    @assertEqual(ref%double, sample%double)
+    !
+  END SUBROUTINE test_read_container
+
+  @test(npes=[1])
+  SUBROUTINE test_dimension_change(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(complex_array_container) ref, sample
+    TYPE(configuration) config
+    TYPE(element_type) element
+    INTEGER ierr
+    !
+    CALL write_reference(this%getProcessRank(), ref)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    ALLOCATE(sample%double(SIZE(ref%double, 1), SIZE(ref%double, 2), SIZE(ref%double, 3) * 2))
+    sample%double(:,:,:SIZE(ref%double, 3)) = ref%double
+    sample%double(:,:,SIZE(ref%double, 3) + 1:) = ref%double**2
+    CALL sample%write_variable(var_double, ierr)
+    @assertEqual(dimension_change_error, ierr)
+    DEALLOCATE(sample%double)
+    ALLOCATE(sample%double(SIZE(ref%double, 1), SIZE(ref%double, 2), 1))
+    element%variable = var_double
+    element%access_index = SIZE(ref%double, 3) + 1
+    CALL sample%write_element(element, ierr)
+    @assertEqual(out_of_bounds_error, ierr)
+    CALL sample%close(ierr)
+    !
+  END SUBROUTINE test_dimension_change
+
+END MODULE testComplex
