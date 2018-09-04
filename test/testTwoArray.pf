@@ -1,0 +1,258 @@
+! This Source Code Form is subject to the terms of the Mozilla Public
+! License, v. 2.0. If a copy of the MPL was not distributed with this
+! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+MODULE testTwoArray
+
+  USE pfunit_mod
+  USE container_interface
+  USE two_array
+  IMPLICIT NONE
+
+CONTAINS
+
+  FUNCTION default_config(comm)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: comm
+    TYPE(configuration) :: default_config
+    !
+    default_config%communicator = comm
+    default_config%filename = 'two_array.io'
+    default_config%mode = MPI_MODE_CREATE + MPI_MODE_RDWR
+    !
+  END FUNCTION default_config
+
+  SUBROUTINE delete_file(rank, config)
+    !
+    INTEGER, INTENT(IN) :: rank
+    TYPE(configuration), INTENT(IN) :: config
+    INTEGER iunit, ierr
+    IF (rank == 0) THEN
+      OPEN(NEWUNIT=iunit, FILE=config%filename, STATUS='old', IOSTAT=ierr)
+      IF (ierr == no_error) CLOSE(iunit, STATUS='delete')
+    END IF
+    CALL MPI_BARRIER(config%communicator, ierr)
+    !
+  END SUBROUTINE delete_file
+
+  SUBROUTINE set_reference(reference)
+    !
+    TYPE(two_array_container), INTENT(INOUT) :: reference
+    INTEGER, PARAMETER :: first_dim = 6, second_dim = 9, third_dim = 3
+    INTEGER ii, jj, counter, ierr
+    !
+    ALLOCATE(reference%first(first_dim, second_dim))
+    counter = 0
+    DO jj = 1, second_dim
+      DO ii = 1, first_dim
+        reference%first(ii, jj) = counter
+        counter = counter + 1
+      END DO
+    END DO
+    ALLOCATE(reference%second(third_dim))
+    DO ii = 1, third_dim
+      reference%second(ii) = counter
+      counter = counter + 1
+    END DO
+    !
+  END SUBROUTINE set_reference
+
+  SUBROUTINE write_reference(rank, reference)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: rank
+    TYPE(two_array_container), INTENT(OUT) :: reference
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    IF (rank == 0) THEN
+      config = default_config(MPI_COMM_SELF)
+      CALL reference%open(config, ierr)
+      CALL set_reference(reference)
+      CALL reference%write(ierr)
+      @assertEqual(no_error, ierr)
+      CALL reference%close(ierr)
+    ELSE
+      CALL set_reference(reference)
+    END IF
+    !
+  END SUBROUTINE write_reference
+
+  @test(npes=[1,2,3,4])
+  SUBROUTINE test_open_close(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) container
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    @assertFalse(container%valid)
+    config = default_config(this%getMpiCommunicator())
+    CALL container%open(config, ierr)
+    @assertEqual(no_error, ierr)
+    @assertTrue(container%valid)
+    CALL container%close(ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(container%valid)
+    !
+  END SUBROUTINE test_open_close
+
+  @test(npes=[1])
+  SUBROUTINE test_read_container(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) ref, sample
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    CALL write_reference(this%getProcessRank(), ref)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    CALL sample%read(ierr)
+    CALL sample%close(ierr)
+    @assertEqual(no_error, ierr)
+    @assertEqual(ref%first, sample%first)
+    @assertEqual(ref%second, sample%second)
+    !
+  END SUBROUTINE test_read_container
+
+  @test(npes=[1])
+  SUBROUTINE test_read_variable(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) ref, sample
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    CALL write_reference(this%getProcessRank(), ref)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    CALL sample%read_variable(var_first, ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(ALLOCATED(sample%second))
+    @assertEqual(ref%first, sample%first)
+    CALL sample%read_variable(var_second, ierr)
+    @assertEqual(no_error, ierr)
+    CALL sample%close(ierr)
+    @assertEqual(ref%first, sample%first)
+    @assertEqual(ref%second, sample%second)
+    !
+  END SUBROUTINE test_read_variable
+
+  @test(npes=[1])
+  SUBROUTINE test_write_variable(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) reference, sample
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    config = default_config(this%getMpiCommunicator())
+    CALL reference%open(config, ierr)
+    CALL set_reference(reference)
+    CALL reference%write_variable(var_first, ierr)
+    @assertEqual(no_error, ierr)
+    CALL reference%write_variable(var_second, ierr)
+    @assertEqual(no_error, ierr)
+    CALL reference%close(ierr)
+    !
+    CALL sample%open(config, ierr)
+    CALL sample%read(ierr)
+    CALL sample%close(ierr)
+    @assertEqual(reference%first, sample%first)
+    @assertEqual(reference%second, sample%second)
+    !
+  END SUBROUTINE test_write_variable
+
+  @test(npes=[1,2,3])
+  SUBROUTINE test_read_parallel(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) ref, sample
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    CALL write_reference(this%getProcessRank(), ref)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    CALL sample%read_all_variable(var_first, ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(ALLOCATED(sample%second))
+    @assertEqual(ref%first, sample%first)
+    CALL sample%read_variable(var_second, ierr)
+    @assertEqual(no_error, ierr)
+    CALL sample%close(ierr)
+    @assertEqual(ref%first, sample%first)
+    @assertEqual(ref%second, sample%second)
+    !
+  END SUBROUTINE test_read_parallel
+
+  @test(npes=[2,4])
+  SUBROUTINE test_read_element(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) ref, sample
+    TYPE(element_type) element
+    TYPE(configuration) config
+    INTEGER ielem, ierr, first_elem, num_elem, step_elem
+
+    CALL write_reference(this%getProcessRank(), ref)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    config = default_config(this%getMpiCommunicator())
+    CALL sample%open(config, ierr)
+    first_elem = this%getProcessRank() + 1
+    num_elem = SIZE(ref%second)
+    step_elem = this%getNumProcesses()
+    element%variable = var_second
+    DO ielem = first_elem, num_elem, step_elem
+      element%access_index = ielem
+      CALL sample%read_element(element, ierr)
+      @assertEqual(no_error, ierr)
+      @assertEqual(ref%second(ielem), sample%second)
+    END DO
+    @assertFalse(ALLOCATED(sample%first))
+    CALL sample%close(ierr)
+    !
+  END SUBROUTINE test_read_element
+
+  @test(npes=[1,3])
+  SUBROUTINE test_write_element(this)
+    !
+    INCLUDE 'mpif.h'
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(two_array_container) ref, sample
+    TYPE(element_type) element
+    TYPE(configuration) config
+    INTEGER ierr, ielem, first_elem, num_elem, step_elem
+    INTEGER(KIND=MPI_OFFSET_KIND) next_offset
+
+    CALL set_reference(ref)
+    config = default_config(this%getMpiCommunicator())
+    CALL delete_file(this%getProcessRank(), config)
+    CALL sample%open(config, ierr)
+    ALLOCATE(sample%first(SIZE(ref%first, 1), 1))
+    first_elem = this%getProcessRank() + 1
+    num_elem = SIZE(ref%first, 2)
+    step_elem = this%getNumProcesses()
+    element%variable = var_first
+    CALL sample%write_dimension(element%variable, [SIZE(ref%first, 1), num_elem], ierr)
+    DO ielem = first_elem, num_elem, step_elem
+      element%access_index = ielem
+      sample%first = ref%first(:, ielem:ielem)
+      CALL sample%write_element(element, ierr)
+      @assertEqual(no_error, ierr)
+    END DO
+    CALL MPI_ALLREDUCE(sample%offset(1), next_offset, 1, MPI_OFFSET, &
+      MPI_MAX, this%getMpiCommunicator(), ierr)
+    @assertEqual(next_offset, sample%offset(1))
+    CALL sample%read_variable(var_first, ierr)
+    @assertEqual(no_error, ierr)
+    CALL sample%close(ierr)
+    @assertEqual(ref%first, sample%first)
+    @assertFalse(ALLOCATED(sample%second))
+    !
+  END SUBROUTINE test_write_element
+
+END MODULE testTwoArray

@@ -1,0 +1,2 @@
+simple.o: ../f90_src/container.o
+two_array.o: ../f90_src/container.o
