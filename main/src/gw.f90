@@ -24,13 +24,13 @@ PROGRAM gw
 !-----------------------------------------------------------------------
 !... This is the main driver of the SternheimerGW code.
 !-----------------------------------------------------------------------
-  USE close_gwq_mod,        ONLY : close_gwq
   USE control_gw,           ONLY : do_sigma_exx, do_sigma_matel, do_coulomb, &
                                    do_sigma_c, do_q0_only, output
   USE disp,                 ONLY : num_k_pts, w_of_k_start, w_of_k_stop
   USE driver,               ONLY : calculation
   USE exchange_module,      ONLY : exchange_wrapper
   USE freq_gw,              ONLY : nwsigma, nwsigwin
+  USE gw_container,         ONLY : close_container
   USE gwsigma,              ONLY : nbnd_sig
   USE io_global,            ONLY : meta_ionode
   USE pp_output_mod,        ONLY : pp_output_open_all
@@ -74,7 +74,7 @@ PROGRAM gw
          CALL clean_pw_gw(.TRUE.)
       END DO
   END IF
-  CALL close_gwq(.TRUE., calc%data)
-  CALL stop_gw(.TRUE.)
+  CALL close_container(calc%data)
+  CALL stop_gw()
 
 END PROGRAM gw

@@ -1,3 +1,2 @@
-close_gwq.o : gw_data.o
+gw_container.o : gw_data.o
 openfilq.o : save_gw_input.o
-opengwfil.o : gw_data.o
