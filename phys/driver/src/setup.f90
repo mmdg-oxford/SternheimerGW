@@ -38,7 +38,7 @@ CONTAINS
                                  wsig_wind_min, wsig_wind_max, nwsigwin
     USE freqbins_module,   ONLY: freqbins
     USE driver,            ONLY: calculation
-    USE gw_container,      ONLY: open_container
+    USE gw_container,      ONLY: open_container, consistent_dimension, write_dimension, gw_dimension
     USE gw_opening,        ONLY: gw_opening_logo, gw_opening_message
     USE gwsigma,           ONLY: ecutsco, ecutsex
     USE mp_global,         ONLY: mp_startup
@@ -46,7 +46,9 @@ CONTAINS
     USE timing_module,     ONLY: time_setup
     !
     TYPE(calculation), INTENT(OUT) :: calc
+    TYPE(gw_dimension) dims
     CHARACTER(*), PARAMETER :: code = 'SternheimerGW'
+    LOGICAL backup_needed
     !
     ! Initialize MPI, clocks, print initial messages
     CALL mp_startup(start_images = .TRUE.)
@@ -64,30 +66,30 @@ CONTAINS
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
     CALL open_container(calc%data)
-    CALL write_dimension(calc)
+    CALL determine_dimension(calc, dims)
+    backup_needed = .NOT.consistent_dimension(calc%data, dims)
+    IF (backup_needed) WRITE(*,*) 'backup not implemented yet' !CALL backup(calc%data)
+    CALL write_dimension(calc%data, dims)
     CALL stop_clock(time_setup)
     !
   END SUBROUTINE setup_calculation
 
-  SUBROUTINE write_dimension(calc)
+  SUBROUTINE determine_dimension(calc, dims)
     !
     USE control_gw,   ONLY: do_sigma_c, do_sigma_exx
     USE driver,       ONLY: calculation
-    USE gw_container, ONLY: write_exch_dim, write_corr_dim
-    TYPE(calculation), INTENT(INOUT) :: calc
+    USE gw_container, ONLY: gw_dimension
+    TYPE(calculation), INTENT(IN) :: calc
+    TYPE(gw_dimension), INTENT(OUT) :: dims
     INTEGER num_g_exch, num_g_corr, num_k_pts, num_omega
-    INTEGER, ALLOCATABLE :: dim_exch(:), dim_corr(:)
     !
     num_g_exch = calc%grid%exch_fft%ngm
     num_g_corr = calc%grid%corr_fft%ngm
     num_k_pts = SIZE(calc%data%k_point, 2)
     num_omega = calc%freq%num_sigma()
-    dim_exch = [num_g_exch, num_g_exch, num_k_pts]
-    dim_corr = [num_g_corr, num_g_corr, num_omega, num_k_pts]
+    IF (do_sigma_exx) dims%exch = [num_g_exch, num_g_exch, num_k_pts]
+    IF (do_sigma_c) dims%corr = [num_g_corr, num_g_corr, num_omega, num_k_pts]
     !
-    IF (do_sigma_exx) CALL write_exch_dim(calc%data, dim_exch)
-    IF (do_sigma_c) CALL write_corr_dim(calc%data, dim_corr)
-    !
-  END SUBROUTINE write_dimension
+  END SUBROUTINE determine_dimension
 
 END MODULE setup

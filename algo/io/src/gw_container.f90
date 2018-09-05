@@ -24,6 +24,10 @@ MODULE gw_container
 
   IMPLICIT NONE
 
+  TYPE gw_dimension
+    INTEGER, ALLOCATABLE :: exch(:), corr(:)
+  END TYPE gw_dimension
+
 CONTAINS
 
   SUBROUTINE open_container(data)
@@ -58,28 +62,57 @@ CONTAINS
     !
   END SUBROUTINE close_container
 
-  SUBROUTINE write_exch_dim(data, exch_dim)
+  LOGICAL FUNCTION consistent_dimension(data, dims)
     !
-    USE gw_data, ONLY: gw_data_container, var_exch
+    USE gw_data, ONLY: gw_data_container, var_exch, var_corr
     TYPE(gw_data_container), INTENT(INOUT) :: data
-    INTEGER, INTENT(IN) :: exch_dim(:)
-    INTEGER ierr
+    TYPE(gw_dimension), INTENT(IN) :: dims
     !
-    CALL data%write_dimension(var_exch, exch_dim, ierr)
-    CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
+    consistent_dimension = .FALSE.
+    IF (ALLOCATED(dims%exch)) THEN
+      IF (.NOT.dimension_correct(data, var_exch, dims%exch)) RETURN
+    END IF
+    IF (ALLOCATED(dims%corr)) THEN
+      IF (.NOT.dimension_correct(data, var_corr, dims%corr)) RETURN
+    END IF
+    consistent_dimension = .TRUE.
     !
-  END SUBROUTINE write_exch_dim
+  END FUNCTION consistent_dimension
 
-  SUBROUTINE write_corr_dim(data, corr_dim)
+  LOGICAL FUNCTION dimension_correct(data, var, ref_dim)
     !
-    USE gw_data, ONLY: gw_data_container, var_corr
+    USE container_interface, ONLY: no_error
+    USE gw_data,             ONLY: gw_data_container
     TYPE(gw_data_container), INTENT(INOUT) :: data
-    INTEGER, INTENT(IN) :: corr_dim(:)
+    INTEGER, INTENT(IN) :: var, ref_dim(:)
+    INTEGER ierr
+    INTEGER, ALLOCATABLE :: test_dim(:)
+    !
+    dimension_correct = .TRUE.
+    CALL data%read_dimension(var, test_dim, ierr)
+    CALL errore(__FILE__, "Error reading dimension", ierr)
+    IF (.NOT.ALLOCATED(test_dim)) RETURN
+    CALL data%check_dimension(ref_dim, test_dim, ierr)
+    dimension_correct = (ierr == no_error)
+    !
+  END FUNCTION dimension_correct 
+
+  SUBROUTINE write_dimension(data, dims)
+    !
+    USE gw_data, ONLY: gw_data_container, var_exch, var_corr
+    TYPE(gw_data_container), INTENT(INOUT) :: data
+    TYPE(gw_dimension), INTENT(IN) :: dims
     INTEGER ierr
     !
-    CALL data%write_dimension(var_corr, corr_dim, ierr)
-    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
+    IF (ALLOCATED(dims%exch)) THEN
+      CALL data%write_dimension(var_exch, dims%exch, ierr)
+      CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
+    END IF
+    IF (ALLOCATED(dims%corr)) THEN
+      CALL data%write_dimension(var_corr, dims%corr, ierr)
+      CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
+    END IF
     !
-  END SUBROUTINE write_corr_dim
+  END SUBROUTINE write_dimension
 
 END MODULE gw_container
