@@ -37,7 +37,7 @@ CONTAINS
     TYPE(configuration) config
     INTEGER ierr
     ! 
-    config%filename = output%file_data
+    config%filename = TRIM(output%file_data)
     CALL data%open(config, ierr)
     CALL errore(__FILE__, "Error opening container for GW data", ierr)
     ALLOCATE(data%k_point(3, num_k_pts))

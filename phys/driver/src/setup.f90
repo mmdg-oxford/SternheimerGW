@@ -75,20 +75,18 @@ CONTAINS
     USE driver,       ONLY: calculation
     USE gw_container, ONLY: write_exch_dim, write_corr_dim
     TYPE(calculation), INTENT(INOUT) :: calc
-    INTEGER num_g_vec, num_k_pts, num_omega
+    INTEGER num_g_exch, num_g_corr, num_k_pts, num_omega
+    INTEGER, ALLOCATABLE :: dim_exch(:), dim_corr(:)
     !
-    IF (do_sigma_c) THEN
-      num_g_vec = calc%grid%exch_fft%ngm
-      num_k_pts = SIZE(calc%data%k_point, 2)
-      CALL write_exch_dim(calc%data, [num_g_vec, num_g_vec, num_k_pts])
-    END IF
+    num_g_exch = calc%grid%exch_fft%ngm
+    num_g_corr = calc%grid%corr_fft%ngm
+    num_k_pts = SIZE(calc%data%k_point, 2)
+    num_omega = calc%freq%num_sigma()
+    dim_exch = [num_g_exch, num_g_exch, num_k_pts]
+    dim_corr = [num_g_corr, num_g_corr, num_omega, num_k_pts]
     !
-    IF (do_sigma_exx) THEN
-      num_g_vec = calc%grid%corr_fft%ngm
-      num_omega = calc%freq%num_sigma()
-      num_k_pts = SIZE(calc%data%k_point, 2)
-      CALL write_corr_dim(calc%data, [num_g_vec, num_g_vec, num_omega, num_k_pts])
-    END IF
+    IF (do_sigma_exx) CALL write_exch_dim(calc%data, dim_exch)
+    IF (do_sigma_c) CALL write_corr_dim(calc%data, dim_corr)
     !
   END SUBROUTINE write_dimension
 
