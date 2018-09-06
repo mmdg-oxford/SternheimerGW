@@ -34,7 +34,6 @@ MODULE container_interface
   INTEGER, PARAMETER :: dimension_change_error = 4
   INTEGER, PARAMETER :: dimension_not_set_error = 5
 
-  INTEGER, PARAMETER :: next_free = 1
   INTEGER(KIND=MPI_OFFSET_KIND), PARAMETER :: not_set = 0
   INTEGER(KIND=MPI_OFFSET_KIND), PARAMETER :: offset_position = 0
 
@@ -81,6 +80,8 @@ MODULE container_interface
     PROCEDURE :: check
     PROCEDURE :: check_dimension
     PROCEDURE :: check_config
+    PROCEDURE :: next_offset
+    PROCEDURE :: set_next_offset
     PROCEDURE :: seek_offset
     PROCEDURE :: update_offset
     PROCEDURE :: increase_offset
@@ -94,7 +95,7 @@ MODULE container_interface
 
   TYPE internal_config
     INTEGER variable
-    INTEGER access_index
+    INTEGER :: access_index = 1
     INTEGER, ALLOCATABLE :: dimension(:)
   END TYPE internal_config
 
@@ -106,15 +107,17 @@ CONTAINS
     CLASS(container_type), INTENT(OUT) :: container
     TYPE(configuration), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
+    INTEGER(KIND=MPI_OFFSET_KIND) num_offset
     INTEGER size_offset
     !
     CALL container%internal_init()
     !
     CALL MPI_TYPE_SIZE(MPI_OFFSET, size_offset, ierr)
     IF (ierr /= no_error) RETURN
-    ALLOCATE(container%offset(container%num_variable() + 1))
+    num_offset = container%num_variable() + 1
+    ALLOCATE(container%offset(num_offset))
     container%offset = not_set
-    container%offset(next_free) = SIZE(container%offset) * size_offset
+    CALL container%set_next_offset(num_offset * size_offset)
     !
     CALL MPI_FILE_OPEN(config%communicator, config%filename, config%mode, &
       MPI_INFO_NULL, container%filehandle, ierr)
@@ -143,7 +146,7 @@ CONTAINS
     !
     CALL container%check(ierr)
     IF (ierr /= no_error) RETURN
-    DO ivar = 2, SIZE(container%offset)
+    DO ivar = 1, container%num_variable()
       CALL container%write_variable(ivar, ierr)
       IF (ierr /= no_error) RETURN
     END DO
@@ -197,7 +200,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    CALL container%seek_offset(variable, ierr)
+    CALL container%check(ierr)
     IF (ierr /= no_error) RETURN
     CALL container%read_dimension(variable, dims, ierr)
     IF (ierr /= no_error) RETURN
@@ -222,11 +225,8 @@ CONTAINS
     !
     CALL container%check(ierr)
     IF (ierr /= no_error) RETURN
-    DO ivar = 2, SIZE(container%offset)
-      config%variable = ivar
-      CALL container%read_dimension(config%variable, config%dimension, ierr)
-      IF (ierr /= no_error) RETURN
-      CALL container%internal_read_variable(MPI_FILE_READ, config, ierr)
+    DO ivar = 1, container%num_variable()
+      CALL container%read_variable(ivar, ierr)
       IF (ierr /= no_error) RETURN
     END DO
     !
@@ -242,11 +242,8 @@ CONTAINS
     !
     CALL container%check(ierr)
     IF (ierr /= no_error) RETURN
-    DO ivar = 2, SIZE(container%offset)
-      config%variable = ivar
-      CALL container%read_dimension(config%variable, config%dimension, ierr)
-      IF (ierr /= no_error) RETURN
-      CALL container%internal_read_variable(MPI_FILE_READ_ALL, config, ierr)
+    DO ivar = 1, container%num_variable()
+      CALL container%read_all_variable(ivar, ierr)
       IF (ierr /= no_error) RETURN
     END DO
     !
@@ -265,6 +262,8 @@ CONTAINS
     config%variable = variable
     CALL container%read_dimension(config%variable, config%dimension, ierr)
     IF (ierr /= no_error) RETURN
+    CALL container%check_config(config, ierr)
+    IF (ierr /= no_error) RETURN
     CALL container%internal_read_variable(MPI_FILE_READ, config, ierr)
     !
   END SUBROUTINE read_variable
@@ -281,6 +280,8 @@ CONTAINS
     IF (ierr /= no_error) RETURN
     config%variable = variable
     CALL container%read_dimension(config%variable, config%dimension, ierr)
+    IF (ierr /= no_error) RETURN
+    CALL container%check_config(config, ierr)
     IF (ierr /= no_error) RETURN
     CALL container%internal_read_variable(MPI_FILE_READ_ALL, config, ierr)
     !
@@ -316,9 +317,11 @@ CONTAINS
     INTEGER, INTENT(OUT), ALLOCATABLE :: dimension(:)
     INTEGER, INTENT(OUT) :: ierr
     !
+    CALL container%check(ierr)
+    IF (ierr /= no_error) RETURN
     CALL container%seek_offset(variable, ierr)
     IF (ierr /= no_error) RETURN
-    IF (container%offset(variable) == container%offset(next_free)) RETURN
+    IF (container%offset(variable) == container%next_offset()) RETURN
     ALLOCATE(dimension(container%num_dim(variable)))
     CALL MPI_FILE_READ(container%filehandle, dimension, SIZE(dimension), &
       MPI_INTEGER, MPI_STATUS_IGNORE, ierr)
@@ -328,7 +331,7 @@ CONTAINS
   PURE INTEGER FUNCTION num_variable(container)
     !
     CLASS(container_type), INTENT(IN) :: container
-    num_variable = SIZE(container%num_dim) - 1
+    num_variable = SIZE(container%num_dim)
     !
   END FUNCTION num_variable
 
@@ -377,20 +380,33 @@ CONTAINS
     !
   END SUBROUTINE check_config
 
+  INTEGER(KIND=MPI_OFFSET_KIND) FUNCTION next_offset(container)
+    !
+    CLASS(container_type), INTENT(IN) :: container
+    next_offset = container%offset(SIZE(container%offset))
+    !
+  END FUNCTION next_offset
+
+  SUBROUTINE set_next_offset(container, offset)
+    !
+    CLASS(container_type), INTENT(INOUT) :: container
+    INTEGER(KIND=MPI_OFFSET_KIND), INTENT(IN) :: offset
+    container%offset(SIZE(container%offset)) = offset
+    !
+  END SUBROUTINE set_next_offset
+
   SUBROUTINE seek_offset(container, variable, ierr)
     !
     CLASS(container_type), INTENT(INOUT) :: container
     INTEGER, INTENT(IN) :: variable
     INTEGER, INTENT(OUT) :: ierr
-    INTEGER(KIND=MPI_OFFSET_KIND) filesize
     !
     IF (container%offset(variable) == not_set) THEN
       CALL MPI_FILE_READ_AT(container%filehandle, offset_position, container%offset, &
         SIZE(container%offset), MPI_OFFSET, MPI_STATUS_IGNORE, ierr)
       IF (ierr /= no_error) RETURN
-      IF (container%offset(variable) == not_set) THEN
-        container%offset(variable) = container%offset(next_free)
-      END IF
+      IF (container%offset(variable) == not_set) &
+        container%offset(variable) = container%next_offset()
     END IF
     CALL MPI_FILE_SEEK(container%filehandle, container%offset(variable), MPI_SEEK_SET, ierr)
     !
@@ -404,7 +420,7 @@ CONTAINS
     !
     CALL MPI_FILE_GET_POSITION(container%filehandle, current_position, ierr)
     IF (ierr /= no_error) RETURN
-    container%offset(next_free) = MAX(container%offset(next_free), current_position)
+    CALL container%set_next_offset(MAX(container%next_offset(), current_position))
     CALL MPI_FILE_WRITE_AT(container%filehandle, offset_position, container%offset, &
       SIZE(container%offset), MPI_OFFSET, MPI_STATUS_IGNORE, ierr)
     !

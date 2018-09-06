@@ -11,7 +11,7 @@ MODULE complex_array
   PUBLIC var_double, var_single, complex_array_container
 
   ENUM, BIND(C)
-    ENUMERATOR :: var_double = 2
+    ENUMERATOR :: var_double = 1
     ENUMERATOR var_single
   END ENUM
 
@@ -32,7 +32,7 @@ CONTAINS
   SUBROUTINE init(container)
     !
     CLASS(complex_array_container), INTENT(OUT) :: container
-    container%num_dim = [1, 3, 2]
+    container%num_dim = [3, 2]
     !
   END SUBROUTINE init
 
