@@ -35,7 +35,7 @@ def module_header(file_description):
         file_description[key]['type'].upper(), key + dim_string)
   var_name = ['var_{}'.format(key) for key in file_description if key != 'name']
   public_string = ', '.join(var_name + [type_name])
-  enum_string = 'ENUMERATOR :: {} = 2'.format(var_name[0])
+  enum_string = 'ENUMERATOR :: {} = 1'.format(var_name[0])
   if len(var_name) > 1:
       enum_string += '\n    ENUMERATOR ' + ', '.join(var_name[1:])
   return """MODULE {0}
@@ -87,7 +87,7 @@ def module_footer(name):
   return "\nEND MODULE {}\n".format(name)
 
 def init(file_description):
-  dim = [1] + [file_description[key]['dim'] for key in file_description if key != 'name']
+  dim = [file_description[key]['dim'] for key in file_description if key != 'name']
   return """
   SUBROUTINE init(container)
     !

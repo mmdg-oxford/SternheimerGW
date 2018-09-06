@@ -11,7 +11,7 @@ MODULE two_array
   PUBLIC var_second, var_first, two_array_container
 
   ENUM, BIND(C)
-    ENUMERATOR :: var_second = 2
+    ENUMERATOR :: var_second = 1
     ENUMERATOR var_first
   END ENUM
 
@@ -32,7 +32,7 @@ CONTAINS
   SUBROUTINE init(container)
     !
     CLASS(two_array_container), INTENT(OUT) :: container
-    container%num_dim = [1, 1, 2]
+    container%num_dim = [1, 2]
     !
   END SUBROUTINE init
 

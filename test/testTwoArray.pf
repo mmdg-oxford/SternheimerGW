@@ -11,10 +11,24 @@ MODULE testTwoArray
 
 CONTAINS
 
-  FUNCTION default_config(comm)
+  FUNCTION unique_filename(line, cpu)
+    !
+    CHARACTER(:), ALLOCATABLE :: unique_filename
+    INTEGER, INTENT(IN) :: line, cpu
+    CHARACTER(RANGE(line) + 2) :: line_str
+    CHARACTER(RANGE(cpu) + 2) :: cpu_str
+    WRITE(line_str,'(i0)') line
+    WRITE(cpu_str,'(i0)') cpu
+    unique_filename = 'two_array_line_' // TRIM(line_str) // &
+                      '_#cpu_' // TRIM(cpu_str) // '.io'
+    !
+  END FUNCTION unique_filename
+
+  FUNCTION default_config(comm, filename)
     !
     INCLUDE 'mpif.h'
     INTEGER, INTENT(IN) :: comm
+    CHARACTER(LEN=*), INTENT(IN) :: filename
     TYPE(configuration) :: default_config
     !
     default_config%communicator = comm
@@ -23,16 +37,15 @@ CONTAINS
     !
   END FUNCTION default_config
 
-  SUBROUTINE delete_file(rank, config)
+  SUBROUTINE delete_file(rank, filename)
     !
     INTEGER, INTENT(IN) :: rank
-    TYPE(configuration), INTENT(IN) :: config
+    CHARACTER(LEN=*), INTENT(IN) :: filename
     INTEGER iunit, ierr
     IF (rank == 0) THEN
-      OPEN(NEWUNIT=iunit, FILE=config%filename, STATUS='old', IOSTAT=ierr)
+      OPEN(NEWUNIT=iunit, FILE=filename, STATUS='old', IOSTAT=ierr)
       IF (ierr == no_error) CLOSE(iunit, STATUS='delete')
     END IF
-    CALL MPI_BARRIER(config%communicator, ierr)
     !
   END SUBROUTINE delete_file
 
@@ -58,16 +71,17 @@ CONTAINS
     !
   END SUBROUTINE set_reference
 
-  SUBROUTINE write_reference(rank, reference)
+  SUBROUTINE write_reference(rank, filename, reference)
     !
     INCLUDE 'mpif.h'
     INTEGER, INTENT(IN) :: rank
+    CHARACTER(LEN=*), INTENT(IN) :: filename
     TYPE(two_array_container), INTENT(OUT) :: reference
     TYPE(configuration) config
     INTEGER ierr
     !
     IF (rank == 0) THEN
-      config = default_config(MPI_COMM_SELF)
+      config = default_config(MPI_COMM_SELF, filename)
       CALL reference%open(config, ierr)
       CALL set_reference(reference)
       CALL reference%write(ierr)
@@ -85,16 +99,19 @@ CONTAINS
     CLASS(MpiTestMethod), INTENT(INOUT) :: this
     TYPE(two_array_container) container
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr
     !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
     @assertFalse(container%valid)
-    config = default_config(this%getMpiCommunicator())
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL container%open(config, ierr)
     @assertEqual(no_error, ierr)
     @assertTrue(container%valid)
     CALL container%close(ierr)
     @assertEqual(no_error, ierr)
     @assertFalse(container%valid)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_open_close
 
@@ -104,16 +121,19 @@ CONTAINS
     CLASS(MpiTestMethod), INTENT(INOUT) :: this
     TYPE(two_array_container) ref, sample
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr
     !
-    CALL write_reference(this%getProcessRank(), ref)
-    config = default_config(this%getMpiCommunicator())
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL sample%open(config, ierr)
     CALL sample%read(ierr)
     CALL sample%close(ierr)
     @assertEqual(no_error, ierr)
     @assertEqual(ref%first, sample%first)
     @assertEqual(ref%second, sample%second)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_read_container
 
@@ -123,10 +143,12 @@ CONTAINS
     CLASS(MpiTestMethod), INTENT(INOUT) :: this
     TYPE(two_array_container) ref, sample
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr
     !
-    CALL write_reference(this%getProcessRank(), ref)
-    config = default_config(this%getMpiCommunicator())
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL sample%open(config, ierr)
     CALL sample%read_variable(var_first, ierr)
     @assertEqual(no_error, ierr)
@@ -137,6 +159,7 @@ CONTAINS
     CALL sample%close(ierr)
     @assertEqual(ref%first, sample%first)
     @assertEqual(ref%second, sample%second)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_read_variable
 
@@ -146,9 +169,11 @@ CONTAINS
     CLASS(MpiTestMethod), INTENT(INOUT) :: this
     TYPE(two_array_container) reference, sample
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr
     !
-    config = default_config(this%getMpiCommunicator())
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL reference%open(config, ierr)
     CALL set_reference(reference)
     CALL reference%write_variable(var_first, ierr)
@@ -162,6 +187,7 @@ CONTAINS
     CALL sample%close(ierr)
     @assertEqual(reference%first, sample%first)
     @assertEqual(reference%second, sample%second)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_write_variable
 
@@ -171,11 +197,13 @@ CONTAINS
     CLASS(MpiTestMethod), INTENT(INOUT) :: this
     TYPE(two_array_container) ref, sample
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr
     !
-    CALL write_reference(this%getProcessRank(), ref)
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
     CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
-    config = default_config(this%getMpiCommunicator())
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL sample%open(config, ierr)
     CALL sample%read_all_variable(var_first, ierr)
     @assertEqual(no_error, ierr)
@@ -186,6 +214,7 @@ CONTAINS
     CALL sample%close(ierr)
     @assertEqual(ref%first, sample%first)
     @assertEqual(ref%second, sample%second)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_read_parallel
 
@@ -196,11 +225,13 @@ CONTAINS
     TYPE(two_array_container) ref, sample
     TYPE(element_type) element
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ielem, ierr, first_elem, num_elem, step_elem
-
-    CALL write_reference(this%getProcessRank(), ref)
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
     CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
-    config = default_config(this%getMpiCommunicator())
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL sample%open(config, ierr)
     first_elem = this%getProcessRank() + 1
     num_elem = SIZE(ref%second)
@@ -214,6 +245,7 @@ CONTAINS
     END DO
     @assertFalse(ALLOCATED(sample%first))
     CALL sample%close(ierr)
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_read_element
 
@@ -225,12 +257,13 @@ CONTAINS
     TYPE(two_array_container) ref, sample
     TYPE(element_type) element
     TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
     INTEGER ierr, ielem, first_elem, num_elem, step_elem
     INTEGER(KIND=MPI_OFFSET_KIND) next_offset
-
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
     CALL set_reference(ref)
-    config = default_config(this%getMpiCommunicator())
-    CALL delete_file(this%getProcessRank(), config)
+    config = default_config(this%getMpiCommunicator(), filename)
     CALL sample%open(config, ierr)
     ALLOCATE(sample%first(SIZE(ref%first, 1), 1))
     first_elem = this%getProcessRank() + 1
@@ -252,6 +285,7 @@ CONTAINS
     CALL sample%close(ierr)
     @assertEqual(ref%first, sample%first)
     @assertFalse(ALLOCATED(sample%second))
+    CALL delete_file(this%getProcessRank(), filename)
     !
   END SUBROUTINE test_write_element
 

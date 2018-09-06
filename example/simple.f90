@@ -11,7 +11,7 @@ MODULE simple
   PUBLIC var_array, simple_container
 
   ENUM, BIND(C)
-    ENUMERATOR :: var_array = 2
+    ENUMERATOR :: var_array = 1
   END ENUM
 
   TYPE, EXTENDS(container_type) :: simple_container
@@ -30,7 +30,7 @@ CONTAINS
   SUBROUTINE init(container)
     !
     CLASS(simple_container), INTENT(OUT) :: container
-    container%num_dim = [1, 2]
+    container%num_dim = [2]
     !
   END SUBROUTINE init
 
