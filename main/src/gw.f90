@@ -20,110 +20,61 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-program gw
+PROGRAM gw
 !-----------------------------------------------------------------------
 !... This is the main driver of the SternheimerGW code.
 !-----------------------------------------------------------------------
-  USE check_stop,           ONLY : check_stop_init
   USE control_gw,           ONLY : do_sigma_exx, do_sigma_matel, do_coulomb, &
-                                   do_sigma_c, do_q0_only, do_imag, output
-  USE debug_module,         ONLY : debug_type
+                                   do_sigma_c, do_q0_only, output
   USE disp,                 ONLY : num_k_pts, w_of_k_start, w_of_k_stop
-  USE environment,          ONLY : environment_start
+  USE driver,               ONLY : calculation
   USE exchange_module,      ONLY : exchange_wrapper
-  USE freq_gw,              ONLY : nwsigma, nwsigwin, wsigmamin, wsigmamax, wcoulmax, nwcoul, &
-                                   wsig_wind_min, wsig_wind_max, nwsigwin
-  USE freqbins_module,      ONLY : freqbins, freqbins_type
-  USE gw_opening,           ONLY : gw_opening_logo, gw_opening_message
-  USE gwsigma,              ONLY : nbnd_sig, ecutsco, ecutsex
-  USE input_parameters,     ONLY : max_seconds, force_symmorphic
-  USE io_files,             ONLY : diropn
+  USE freq_gw,              ONLY : nwsigma, nwsigwin
+  USE gw_container,         ONLY : close_container
+  USE gwsigma,              ONLY : nbnd_sig
   USE io_global,            ONLY : meta_ionode
-  USE mp_global,            ONLY : mp_startup
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
-  USE select_solver_module, ONLY : select_solver_type
-  USE setup_nscf_module,    ONLY : sigma_config_type
-  USE sigma_grid_module,    ONLY : sigma_grid, sigma_grid_type
-  USE sigma_io_module,      ONLY : sigma_io_close_write
+  USE setup,                ONLY : setup_calculation
+  USE sigma_matel,          ONLY : matrix_element
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup
-  USE truncation_module,    ONLY : vcut_type
 
   IMPLICIT NONE
-
-  !> the name of the code
-  CHARACTER(*), PARAMETER :: code = 'SternheimerGW'
 
   INTEGER             :: ik
   LOGICAL             :: do_band, do_matel
 
-  !> stores the frequencies uses for the calculation
-  TYPE(freqbins_type) freq
+  TYPE(calculation) calc
 
-  !> stores the FFT grids used in the calculation
-  TYPE(sigma_grid_type) grid
+  CALL setup_calculation(calc)
 
-  !> stores the configuration of the linear solver for the screened Coulomb interaction
-  TYPE(select_solver_type) config_coul
-
-  !> stores the configuration of the linear solver for the Green's function
-  TYPE(select_solver_type) config_green
-
-  !> stores the truncated Coulomb potential
-  TYPE(vcut_type) vcut
-
-  !> stores the configuration of the self-energy calculation
-  TYPE(sigma_config_type), ALLOCATABLE :: config(:)
-
-  !> the debug configuration of the calculation
-  TYPE(debug_type) debug
-
-! Initialize MPI, clocks, print initial messages
-  CALL mp_startup(start_images = .TRUE.)
-  CALL gw_opening_logo()
-  CALL environment_start(code)
-  CALL gw_opening_message() 
-  CALL start_clock(time_setup)
-! Initialize GW calculation, Read Ground state information.
-  
-  call gwq_readin(config_coul, config_green, freq, vcut, debug)
-  call check_stop_init()
-  call check_initial_status()
-! Initialize frequency grids, FFT grids for correlation
-! and exchange operators, open relevant GW-files.
-  call freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
-                wsig_wind_min, wsig_wind_max, nwsigwin, freq)
-  call sigma_grid(freq, ecutsex, ecutsco, grid)
-  call opengwfil(grid)
-  call stop_clock(time_setup)
 ! Calculation W
-  if(do_coulomb) call do_stern(config_coul, grid, freq)
+  IF(do_coulomb) CALL do_stern(calc)
   ik = 1
   do_band  = .TRUE.
   do_matel = .TRUE.
 ! Calculation of CORRELATION energy \Sigma^{c}_{k}=\sum_{q}G_{k-q}{W_{q}-v_{q}}:
-  if (.not.do_q0_only) then
-      do ik = w_of_k_start, w_of_k_stop
-         call start_clock(time_setup)
-         call run_nscf(do_band, do_matel, ik, config)
-         call initialize_gw(.FALSE.)
-         call stop_clock(time_setup)
-         if (do_sigma_c) call sigma_wrapper(ik, grid, config_green, freq, vcut, config, debug)
+  IF (.NOT.do_q0_only) THEN
+      DO ik = w_of_k_start, w_of_k_stop
+         CALL start_clock(time_setup)
+         CALL run_nscf(do_band, do_matel, ik, calc%config)
+         CALL initialize_gw(.FALSE.)
+         CALL stop_clock(time_setup)
+         IF (do_sigma_c) CALL sigma_wrapper(ik, calc)
 ! Calculation of EXCHANGE energy \Sigma^{x}_{k}= \sum_{q}G_{k}{v_{k-S^{-1}q}}:
-         if (do_sigma_exx) call exchange_wrapper(ik, grid, vcut)
+         IF (do_sigma_exx) call exchange_wrapper(ik, calc)
 ! Calculation of Matrix Elements <n\k| V^{xc}, \Sigma^{x}, \Sigma^{c}(iw) |n\k>:
-         if (do_sigma_matel) then
-           if (meta_ionode .AND. ik == w_of_k_start) then         
+         IF (do_sigma_matel) then
+           IF (meta_ionode .AND. ik == w_of_k_start) then         
              call pp_output_open_all(num_k_pts, nbnd_sig, nwsigwin, nwsigma, output)
-           end if
-           call sigma_matel(ik, grid, freq)
-         end if
-         call clean_pw_gw(.TRUE.)
-      enddo
-  end if
-  call close_gwq(.TRUE.)
-  IF (meta_ionode) CALL sigma_io_close_write(output%unit_sigma)
-  call stop_gw( .TRUE. )
+           END IF
+           CALL matrix_element(ik, calc)
+         END IF
+         CALL clean_pw_gw(.TRUE.)
+      END DO
+  END IF
+  CALL close_container(calc%data)
+  CALL stop_gw()
 
-end program gw
+END PROGRAM gw

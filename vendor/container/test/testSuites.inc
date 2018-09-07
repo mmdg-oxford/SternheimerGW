@@ -1,0 +1,3 @@
+ADD_TEST_SUITE(testSimple_suite)
+ADD_TEST_SUITE(testTwoArray_suite)
+ADD_TEST_SUITE(testComplex_suite)

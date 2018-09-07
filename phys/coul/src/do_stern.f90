@@ -24,41 +24,35 @@
 !!
 !! This routine is the driver routine for the solvers. Depending on the choice
 !! in the input file either a direct or an iterative solver is used.
-SUBROUTINE do_stern(config, grid, freq)
+SUBROUTINE do_stern(calc)
 
   USE constants,            ONLY: eps6
+  USE container_interface,  ONLY: element_type
   USE control_gw,           ONLY: do_q0_only, solve_direct, do_epsil, plot_coul, &
                                   model_coul, tr2_gw
   USE disp,                 ONLY: nqs, num_k_pts, w_of_q_start, x_q, xk_kpoints
+  USE driver,               ONLY: calculation
   USE freq_gw,              ONLY: nfs
-  USE freqbins_module,      ONLY: freqbins_type
+  USE gw_data,              ONLY: var_coul
   USE gwsymm,               ONLY: ngmunique, ig_unique, use_symm, sym_friend, sym_ig
   USE io_global,            ONLY: stdout, meta_ionode
   USE kinds,                ONLY: dp
   USE klist,                ONLY: lgauss
   USE mp,                   ONLY: mp_sum, mp_barrier
   USE mp_images,            ONLY: inter_image_comm, my_image_id
-  USE mp_world,             ONLY: mpime
   USE parallel_module,      ONLY: parallel_task, mp_gatherv
   USE plot_coulomb_module,  ONLY: plot_coulomb
   USE run_nscf_module,      ONLY: run_nscf
-  USE select_solver_module, ONLY: select_solver_type
-  USE sigma_grid_module,    ONLY: sigma_grid_type
   USE timing_module,        ONLY: time_coulomb, time_coul_nscf, time_coul_invert, &
                                   time_coul_io, time_coul_symm, time_coul_unfold, &
                                   time_coul_comm
-  USE units_gw,             ONLY: lrcoul, iuncoul
 
 IMPLICIT NONE
 
-  !> stores the configuration of the linear solver for the screened Coulomb interaction
-  TYPE(select_solver_type), INTENT(IN) :: config
+  !> store the data of the calculation
+  TYPE(calculation), INTENT(INOUT) :: calc
 
-  !> the FFT grid used to represent correlation and exchange
-  TYPE(sigma_grid_type),    INTENT(IN) :: grid
-
-  !> the definition of the frequency grid
-  TYPE(freqbins_type),      INTENT(IN) :: freq
+  TYPE(element_type) element
 
   !> the number of G vectors in the correlation grid
   INTEGER :: num_g_corr
@@ -75,14 +69,11 @@ IMPLICIT NONE
   !> the screened Coulomb interaction gathered on the root process
   COMPLEX(dp), ALLOCATABLE :: scrcoul_root(:,:,:)
 
-  !> the unfolded Coulomb interaction
-  COMPLEX(dp), ALLOCATABLE :: scrcoul_g(:,:,:)
-
   !> the dielectric constant at the q + G = 0 point
   COMPLEX(dp), ALLOCATABLE :: eps_m(:)
 
   !> loop variables
-  INTEGER :: iq, ig, igstart, igstop, ios, iq1, iq2
+  INTEGER :: iq, ig, igstart, igstop, iq1, iq2, ierr
   LOGICAL :: do_band, do_iq, setup_pw, do_matel
 
   !> we need a special treatment for the case q + G = 0
@@ -101,16 +92,10 @@ IMPLICIT NONE
   CALL start_clock(time_coulomb)
 
   ! set helper variable
-  num_g_corr = grid%corr_fft%ngm
+  num_g_corr = calc%grid%corr_fft%ngm
 
   ! some tasks are only done by the root process
   is_root = my_image_id == root_id
-
-  IF (meta_ionode) THEN
-    ALLOCATE(scrcoul_g(num_g_corr, num_g_corr, nfs))
-  ELSE
-    ALLOCATE(scrcoul_g(1,1,1))
-  END IF
 
   ! allocate arrays for symmetry routine
   ALLOCATE(ig_unique(num_g_corr))
@@ -133,6 +118,8 @@ IMPLICIT NONE
     iq1 = w_of_q_start
     iq2 = num_k_pts
   ENDIF
+  CALL calc%data%write_dimension(var_coul, [num_g_corr, num_g_corr, nfs, iq2], ierr)
+  CALL errore(__FILE__, "Error writing dimension for Coulomb matrix", ierr)
     
   DO iq = iq1, iq2
     ! Perform head of dielectric matrix calculation.
@@ -161,7 +148,7 @@ IMPLICIT NONE
       CALL stop_clock(time_coul_nscf)
 
       CALL initialize_gw(.TRUE.)
-      CALL coulomb_q0G0(config, eps_m)
+      CALL coulomb_q0G0(calc%config_coul, eps_m)
       WRITE(stdout,'(5x, "epsM(0) = ", f12.7)') eps_m(1)
       WRITE(stdout,'(5x, "epsM(iwp) = ", f12.7)') eps_m(2)
       CALL clean_pw_gw(.FALSE.)
@@ -206,7 +193,7 @@ IMPLICIT NONE
     ALLOCATE(scrcoul_loc(num_g_corr, nfs, num_task_loc))
 
     ! evaluate screened Coulomb interaction and collect on root
-    CALL coulomb(config, igstart, num_g_corr, num_task_loc, scrcoul_loc)
+    CALL coulomb(calc%config_coul, igstart, num_g_corr, num_task_loc, scrcoul_loc)
     CALL start_clock(time_coul_comm)
     CALL mp_gatherv(inter_image_comm, root_id, num_task, scrcoul_loc, scrcoul_root)
     CALL stop_clock(time_coul_comm)
@@ -217,26 +204,30 @@ IMPLICIT NONE
       ! unfold W from reduced array to full array
       ! also reorder the indices
       CALL start_clock(time_coul_unfold)
-      CALL unfold_w(num_g_corr, scrcoul_root, scrcoul_g)
+      ALLOCATE(calc%data%coul(num_g_corr, num_g_corr, nfs, 1))
+      CALL unfold_w(num_g_corr, scrcoul_root, calc%data%coul)
       CALL stop_clock(time_coul_unfold)
 
       ! set the special |q + G| = 0 element
-      IF (lgamma) scrcoul_g(1,1,:) = eps_m
+      IF (lgamma) calc%data%coul(1,1,:,1) = eps_m
 
       ! for the direct solver W = eps^-1
       IF (solve_direct) THEN
-        WRITE(1000+mpime, '("UNFOLDING, INVERTING, WRITING W")')
         CALL start_clock(time_coul_invert)
-        CALL invert_epsilon(num_g_corr, scrcoul_g, lgamma)
+        CALL invert_epsilon(num_g_corr, calc%data%coul, lgamma)
         CALL stop_clock(time_coul_invert)
       END IF
 
       ! write to file
       CALL start_clock(time_coul_io)
-      CALL davcio(scrcoul_g, lrcoul, iuncoul, iq, +1, ios)
+      element%variable = var_coul
+      element%access_index = iq
+      CALL calc%data%write_element(element, ierr)
+      CALL errore(__FILE__, "Error writing the Coulomb matrix", ierr)
       CALL stop_clock(time_coul_io)
 
-      IF (plot_coul) CALL plot_coulomb(model_coul, tr2_gw, grid, freq, scrcoul_g)
+      IF (plot_coul) CALL plot_coulomb(model_coul, tr2_gw, calc%grid, calc%freq, calc%data%coul(:,:,:,1))
+      DEALLOCATE(calc%data%coul)
 
     END IF ! root
 
@@ -252,9 +243,7 @@ IMPLICIT NONE
 
   END DO ! iq
 
-  IF (meta_ionode) CLOSE(iuncoul)
   WRITE(stdout, '("Finished Calculating Screened Coulomb")')
-  IF (ALLOCATED(scrcoul_g)) DEALLOCATE(scrcoul_g)
   DEALLOCATE(eps_m)
   DEALLOCATE(ig_unique)
   DEALLOCATE(sym_ig)

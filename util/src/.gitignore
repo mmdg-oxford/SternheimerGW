@@ -1,2 +1,4 @@
 .debug
 .no_debug
+version.f90.tmp
+version.f90

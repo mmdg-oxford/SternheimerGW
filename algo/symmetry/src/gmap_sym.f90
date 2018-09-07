@@ -45,7 +45,6 @@
   USE fft_base,      ONLY : dfftp
   USE gvect,         ONLY : mill, ngm
   USE kinds,         ONLY : DP
-  USE mp_world,      ONLY : mpime
 
   implicit none
   !
@@ -142,7 +141,6 @@
     !
     IF (notfound.gt.0) then
        write(6,'("WRITE GVEC not rotated properly gmap_sym.")')
-       write(1000+mpime,'("WRITE GVEC not rotated properly gmap_sym.")')
        stop
     ENDIF
     ! CALL errore ('gmap_sym','incomplete mapping of G vectors: notfound = ',notfound)

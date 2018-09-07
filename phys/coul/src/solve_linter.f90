@@ -315,11 +315,6 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
       CALL init_us_2(npwq, igk_k(1, ikq), xk(1, ikq), vkb)
       CALL g2_kin(ikq)
       !
-      ! compute preconditioning matrix h_diag used by cgsolve_all
-      ! deactivated because we don't use a preconditioned solver
-      !
-!      CALL h_prec(ik, evq, h_diag)
-      !
       ! in the first iteration we initialize the linear system
       ! and may use the multishift solver
       IF (first_iteration) THEN
@@ -329,7 +324,7 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
         !
         nrec = ik
         CALL dvqpsi_us(dvbarein, ik, .FALSE.)
-        CALL save_buffer(dvpsi, lrbar, iubar, nrec)
+        IF (.NOT.direct_solver) CALL save_buffer(dvpsi, lrbar, iubar, nrec)
         !
         ! Orthogonalize dvpsi to valence states: ps = <evq|dvpsi>
         ! Apply -P_c^+.
@@ -408,10 +403,6 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
           !-P_c^ = - (1-P_v^):
           CALL orthogonalize(dvpsi, evq, ikk, ikq, dpsi(:,:,ifreq), npwq, .FALSE.)
           !
-          ! starting value for delta_psi is read from iudwf
-          ! TODO: restarting is deactivated because bicgstab doesn't take
-          !       a starting value in the current form
-          !
           ! threshold for iterative solution of the linear system
           !
           thresh = MIN(1.d-1 * SQRT(dr2), 1.d-2)
@@ -479,9 +470,6 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
         !
       END IF ! zero_freq
       !
-      ! writes delta_psi+- on iunit iudwf, k=kpoint
-      ! TODO: currently deactivated because solver doesn't take previous input
-      !
       ! calculates dvscf, sum over k => dvscf_q_ipert
       !
       weight = wk(ikk)
@@ -508,25 +496,9 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
       CALL ZCOPY(num_freq * nspin_mag * dfftp%nnr, drhoscf, 1, drhoscfh, 1)
     ENDIF
     !
-    ! In the noncolinear, spin-orbit case rotate dbecsum
-    !
-!    IF (noncolin .AND. okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, 1)
-    !
-    ! Now we compute for all perturbations the total charge and potential
-    !
-!    CALL addusddens(drhoscfh, dbecsum, 1, 1, 0)
-    !
     ! Reduce the delta rho across pools
     !
     CALL mp_sum(drhoscfh, inter_pool_comm)
-    !
-    ! After the loop over the perturbations we have the linear change
-    ! in the charge density for each mode of this representation.
-    ! Here we symmetrize them ...
-    ! TODO check if/how symmetrization can be used
-    !
-    ! ... save them on disk and
-    ! compute the corresponding change in scf potential
     !
     ! average value of dV_bare
     meandvb = SQRT(SUM(ABS(dvbarein)**2)) / REAL(dffts%nnr, KIND = dp)
@@ -548,8 +520,6 @@ SUBROUTINE solve_linter(config_global, num_iter, dvbarein, freq, drhoscf)
           CALL invfft('Rho', dvscfout(:, is, ifreq), dfftp)
         END DO ! is
       END IF
-      !
-      ! TODO write to file for restarting
       !
       ! Compute the response HXC potential
       !

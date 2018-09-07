@@ -29,7 +29,7 @@ SUBROUTINE openfilq()
  
   USE buffers,          ONLY : open_buffer
   USE control_flags,    ONLY : io_level
-  USE control_gw,       ONLY : tmp_dir_gw, do_coulomb
+  USE control_gw,       ONLY : tmp_dir_gw, do_coulomb, solve_direct
   USE control_lr,       ONLY : lgamma
   USE io_files,         ONLY : tmp_dir, diropn, seqopn, prefix
   USE noncollin_module, ONLY : npol
@@ -63,7 +63,7 @@ SUBROUTINE openfilq()
   !
   !    The file with deltaV_{bare} * psi
   !
-  IF (do_coulomb) THEN
+  IF (do_coulomb.AND..NOT.solve_direct) THEN
     iubar = 21
     lrbar = nbnd * npwx * npol
     CALL open_buffer(iubar, 'bar', lrbar, io_level, exst_mem, exst, tmp_dir)

@@ -24,7 +24,7 @@
 include ../../module
 include $(ESPRESSO)/make.inc
 
-SRC = $(wildcard *.f90)
+SRC = $(wildcard *.f90) version.f90
 OBJ = $(SRC:.f90=.o)
 LIB = libutil.a
 
@@ -41,7 +41,12 @@ debug : .debug all
 	-if [ -f .no_debug ]; then rm -f debug.o .no_debug; fi
 	-touch $@
 
-all: $(LIB) 
+version : 
+	bash update_version
+
+version.f90 : version
+
+all: version $(LIB) 
 
 $(LIB) : $(OBJ)
 	$(AR) $(ARFLAGS) $@ $?
@@ -57,7 +62,7 @@ tmp.depend: $(SRC)
 clean:
 	-rm *.o *.mod $(LIB)
 
-.PHONY: all debug no_debug clean depend
+.PHONY: all debug no_debug clean depend version
 .INTERMEDIATE: tmp.depend
 
 -include make.depend

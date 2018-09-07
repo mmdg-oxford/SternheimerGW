@@ -30,12 +30,7 @@ MODFLAGS = $(BASEMOD_FLAGS) $(MOD_FLAG)$(ESPRESSO)/PW/src $(MOD_FLAG)$(ESPRESSO)
 
 EXE = gw.x
 
-GWOBJS = \
-gw.o\
-gw_input.o\
-gw_opening.o\
-gwq_readin.o\
-version.o
+GWOBJS = gw.o
 
 GWLIBS = ../../phys/libphys.a ../../algo/libalgo.a ../../data/libdata.a ../../util/src/libutil.a ../../vendor/libvendor.a
 LRMODS = $(ESPRESSO)/LR_Modules/liblrmod.a
@@ -47,7 +42,7 @@ QEMODS = $(ESPRESSO)/Modules/libqemod.a             $(ESPRESSO)/FFTXlib/libqefft
          $(ESPRESSO)/dft-d3/libdftd3qe.a
 LIBOBJS	= $(ESPRESSO)/clib/clib.a $(ESPRESSO)/iotk/src/libiotk.a
 
-all : version libgw.a $(EXE)
+all : libgw.a $(EXE)
 
 depend: tmp.depend
 	awk '!/@/' $< > make.depend
@@ -55,25 +50,6 @@ depend: tmp.depend
 tmp.depend: $(SRC)
 	$(ESPRESSO)/install/moduledep.sh > $@
 	$(ESPRESSO)/install/includedep.sh >> $@
-
-version : 
-	bash update_version
-
-version.f90 : version
-
-gw_input.f90 : gw_input.yml input_generator.awk
-	awk -f input_generator.awk $< > $@
-
-tiddler: gw_input.yml input_generator.awk check-wiki
-	awk -f input_generator.awk -v tiddler=1 -v path=$(WIKI)/tiddlers $<
-
-check-wiki:
-ifndef WIKI
-	$(error WIKI must be set to the path to the wiki.)
-endif
-ifeq ("$(wildcard $(WIKI)/tiddlers)", "")
-	$(error directory $(WIKI)/tiddlers does not exist)
-endif
 
 $(EXE) : gw.o libgw.a $(GWLIBS) $(PWOBJS) $(LRMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ $< libgw.a $(GWLIBS) \
@@ -87,7 +63,7 @@ libgw.a : $(GWOBJS)
 clean :
 	- rm -f *.x *.o *.a *.mod
 
-.PHONY: all version clean
+.PHONY: all clean
 .INTERMEDIATE: tmp.depend
 
 -include make.depend

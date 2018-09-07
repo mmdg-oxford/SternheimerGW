@@ -120,58 +120,39 @@ CONTAINS
 
   !> This function provides a wrapper that extracts the necessary information
   !! from the global modules to evaluate the self energy.
-  SUBROUTINE sigma_wrapper(ikpt, grid, config_green, freq, vcut, config, debug)
+  SUBROUTINE sigma_wrapper(ikpt, calc)
 
     USE analytic_module,      ONLY: analytic_coeff
     USE cell_base,            ONLY: omega
     USE constants,            ONLY: tpi
-    USE control_gw,           ONLY: output, tmp_dir_coul, model_coul, tr2_gw
+    USE container_interface,  ONLY: element_type
+    USE control_gw,           ONLY: model_coul, tr2_gw
     USE coulpade_module,      ONLY: coulpade
-    USE debug_module,         ONLY: debug_type, debug_set, test_nan
-    USE disp,                 ONLY: x_q
+    USE debug_module,         ONLY: debug_set, test_nan
+    USE disp,                 ONLY: x_q, num_k_pts, nqs
+    USE driver,               ONLY: calculation
     USE ener,                 ONLY: ef
     USE fft6_module,          ONLY: fft_map_generate
-    USE freqbins_module,      ONLY: freqbins_type
     USE gvect,                ONLY: mill
-    USE io_files,             ONLY: prefix
+    USE gw_data,              ONLY: var_corr, var_coul
     USE io_global,            ONLY: meta_ionode, ionode_id, stdout
     USE kinds,                ONLY: dp
     USE klist,                ONLY: xk, lgauss
     USE mp,                   ONLY: mp_bcast
     USE mp_images,            ONLY: inter_image_comm, root_image
     USE mp_pools,             ONLY: inter_pool_comm, root_pool, me_pool
-    USE output_mod,           ONLY: filcoul
     USE parallel_module,      ONLY: mp_root_sum
-    USE select_solver_module, ONLY: select_solver_type
-    USE setup_nscf_module,    ONLY: sigma_config_type
-    USE sigma_grid_module,    ONLY: sigma_grid_type
-    USE sigma_io_module,      ONLY: sigma_io_write_c
     USE symm_base,            ONLY: nsym, s, invs, ftau, nrot
     USE timing_module,        ONLY: time_sigma_c, time_sigma_setup, &
                                     time_sigma_io, time_sigma_comm
-    USE truncation_module,    ONLY: vcut_type
-    USE units_gw,             ONLY: iuncoul, lrcoul, iunsigma, lrsigma
 
     !> index of the k-point for which the self energy is evaluated
     INTEGER, INTENT(IN) :: ikpt
 
-    !> the FFT grids used for the Fourier transformation
-    TYPE(sigma_grid_type), INTENT(IN) :: grid
+    !> Stores the data produced by the GW calculation
+    TYPE(calculation), INTENT(INOUT) :: calc
 
-    !> the configuration of the linear solver for the Green's function
-    TYPE(select_solver_type), INTENT(IN) :: config_green
-
-    !> type containing the information about the frequencies used for the integration
-    TYPE(freqbins_type), INTENT(IN) :: freq
-
-    !> the truncated Coulomb potential
-    TYPE(vcut_type), INTENT(IN) :: vcut
-
-    !> evaluate the self-energy for these configurations
-    TYPE(sigma_config_type), INTENT(IN) :: config(:)
-
-    !> the debug configuration of the calculation
-    TYPE(debug_type), INTENT(IN) :: debug
+    TYPE(element_type) element
 
     !> complex constant of zero
     COMPLEX(dp), PARAMETER :: zero = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
@@ -211,32 +192,20 @@ CONTAINS
     !> the map from local to global G vectors
     INTEGER, ALLOCATABLE :: fft_map(:)
 
-    !> the screened Coulomb interaction
-    COMPLEX(dp), ALLOCATABLE :: coulomb(:,:,:)
+    !> coefficients of the analytic continuation
+    COMPLEX(dp), ALLOCATABLE :: coul_coeff(:,:,:)
 
     !> the self-energy at the current k-point
     COMPLEX(dp), ALLOCATABLE :: sigma(:,:,:)
 
-    !> the self-energy at the current k-point collected on the root process
-    COMPLEX(dp), ALLOCATABLE :: sigma_root(:,:,:)
-
     !> number of bytes in a real
     INTEGER, PARAMETER   :: byte_real = 8
-
-    !> name of file in which the Coulomb interaction is store
-    CHARACTER(:), ALLOCATABLE :: filename
-
-    !> record in which the result are written
-    INTEGER irec
 
     !> counter on the frequencies
     INTEGER ifreq
 
     !> error flag from file opening
     INTEGER ierr
-
-    !> flag indicating whether Coulomb file is already opened
-    LOGICAL opend
 
     !> debug correlation part of self energy
     LOGICAL debug_sigma
@@ -248,16 +217,16 @@ CONTAINS
     WRITE(stdout, '(5x, a, 3f8.4, a)') 'evaluate self energy for k = (', xk(:, ikpt), ' )'
 
     ! set helper variable
-    num_g_corr  = grid%corr_fft%ngm
-    num_gp_corr = grid%corr_par_fft%ngm
-    debug_sigma = debug_set .AND. debug%sigma_corr
-    CALL fft_map_generate(grid%corr_par_fft, mill, fft_map)
+    num_g_corr  = calc%grid%corr_fft%ngm
+    num_gp_corr = calc%grid%corr_par_fft%ngm
+    debug_sigma = debug_set .AND. calc%debug%sigma_corr
+    CALL fft_map_generate(calc%grid%corr_par_fft, mill, fft_map)
 
     !
     ! set the prefactor depending on whether we integrate along the real or
     ! the imaginary frequency axis
     !
-    IF (freq%imag_sigma) THEN
+    IF (calc%freq%imag_sigma) THEN
       prefactor = CMPLX(-1.0_dp / (tpi * REAL(nsym, KIND=dp)), 0.0_dp, KIND=dp)
     ELSE
       prefactor = CMPLX(0.0_dp, 1.0_dp / (tpi * REAL(nsym, KIND=dp)), KIND=dp)
@@ -293,48 +262,37 @@ CONTAINS
     !
     ! initialize self energy
     !
-    ALLOCATE(sigma(num_g_corr, num_gp_corr, freq%num_sigma()))
+    ALLOCATE(sigma(num_g_corr, num_gp_corr, calc%freq%num_sigma()))
     sigma = zero
 
     !
-    ! open the file containing the coulomb interaction
-    ! TODO a wrapper routine for all I/O
-    !
-    INQUIRE(UNIT = iuncoul, OPENED = opend)
-    IF (.NOT. opend) THEN
-      !
-      filename = TRIM(tmp_dir_coul) // TRIM(prefix) // "." // TRIM(filcoul) // "1"
-      OPEN(UNIT = iuncoul, FILE = filename, IOSTAT = ierr, &
-           ACCESS = 'direct', STATUS = 'old', RECL = byte_real * lrcoul)
-      CALL errore(__FILE__, "error opening " // filename, ierr)
-      !
-    END IF ! open file
-    !
     ! initialize index of q (set to 0 so that it is always read on first call)
-    iq = 0
     !
-    ! allocate array for the coulomb matrix
-    ALLOCATE(coulomb(num_g_corr, num_g_corr, freq%num_freq()))
+    iq = 0
 
     !
     ! sum over all q-points
     !
-    DO icon = 1, SIZE(config)
+    DO icon = 1, SIZE(calc%config)
       !
-      WRITE(stdout, '(5x,a,3f8.4,a)', ADVANCE='NO') 'k + q = (', xk(:,config(icon)%index_kq), ' )'
+      WRITE(stdout, '(5x,a,3f8.4,a)', ADVANCE='NO') 'k + q = (', xk(:,calc%config(icon)%index_kq), ' )'
       !
       ! evaluate the coefficients for the analytic continuation of W
       !
-      IF (config(icon)%index_q /= iq) THEN
+      IF (calc%config(icon)%index_q /= iq) THEN
         !
-        iq = config(icon)%index_q
-        CALL davcio(coulomb, lrcoul, iuncoul, iq, -1)
-        CALL coulpade(x_q(:,iq), vcut, coulomb)
-        CALL analytic_coeff(model_coul, tr2_gw, freq, coulomb)
+        iq = calc%config(icon)%index_q
+        element%variable = var_coul
+        element%access_index = iq
+        CALL calc%data%read_element(element, ierr)
+        CALL errore(__FILE__, "Error reading Coulomb matrix", ierr)
+        CALL coulpade(x_q(:,iq), calc%vcut, calc%data%coul(:,:,:,1))
+        CALL analytic_coeff(model_coul, tr2_gw, calc%freq, calc%data%coul(:,:,:,1), coul_coeff)
+        DEALLOCATE(calc%data%coul)
         !
         ! check if any NaN occured in coulpade
         IF (debug_sigma) THEN
-          IF (ANY(test_nan(coulomb))) THEN
+          IF (ANY(test_nan(calc%data%coul))) THEN
             CALL errore(__FILE__, 'Found a NaN in Coulomb after analytic continuation', iq)
           END IF
         END IF
@@ -343,24 +301,22 @@ CONTAINS
       !
       ! determine the prefactor
       !
-      alpha = config(icon)%weight * prefactor
+      alpha = calc%config(icon)%weight * prefactor
       !
       ! evaluate Sigma
       !
-      CALL sigma_correlation(omega, grid, config_green,                 &
-                             mu, alpha, config(icon)%index_kq, freq,    &
-                             gmapsym(:, config(icon)%sym_op), &
-                             coulomb, sigma, debug)
+      CALL sigma_correlation(omega, calc%grid, calc%config_green,  &
+                             mu, alpha, calc%config(icon)%index_kq, calc%freq, &
+                             gmapsym(:, calc%config(icon)%sym_op), &
+                             coul_coeff, sigma, calc%debug)
       !
     END DO ! icon
 
     DEALLOCATE(gmapsym)
-    DEALLOCATE(coulomb)
 
     !
     ! collect sigma on a single process
     !
-    ! TODO replace this by parallel I/O
     CALL start_clock(time_sigma_comm)
 
     ! first sum sigma across the pool
@@ -369,19 +325,19 @@ CONTAINS
     ! unpack sigma in the large array
     IF (me_pool == root_pool) THEN
       !
-      ALLOCATE(sigma_root(num_g_corr, num_g_corr, freq%num_sigma()), STAT = ierr)
+      ALLOCATE(calc%data%corr(num_g_corr, num_g_corr, calc%freq%num_sigma(), 1), STAT = ierr)
       IF (ierr /= 0) THEN
         CALL errore(__FILE__, "error allocating array to collect sigma", ierr)
         RETURN
       END IF
       !
-      sigma_root = zero
+      calc%data%corr = zero
       !
-      DO ifreq = 1, freq%num_sigma()
-        sigma_root(:, fft_map, ifreq) = sigma(:,:,ifreq)
+      DO ifreq = 1, calc%freq%num_sigma()
+        calc%data%corr(:, fft_map, ifreq, 1) = sigma(:,:,ifreq)
       END DO
       !
-      CALL mp_root_sum(inter_image_comm, root_image, sigma_root)
+      CALL mp_root_sum(inter_image_comm, root_image, calc%data%corr(:,:,:,1))
       !
     END IF
 
@@ -393,16 +349,15 @@ CONTAINS
     ! the root process writes sigma to file
     !
     CALL start_clock(time_sigma_io)
-    IF (meta_ionode .AND. ALLOCATED(sigma_root)) THEN
+    IF (meta_ionode .AND. ALLOCATED(calc%data%corr)) THEN
       !
-      DO ifreq = 1, freq%num_sigma()
-        irec = (ikpt - 1) * freq%num_sigma() + ifreq
-        CALL davcio(sigma_root(:,:,ifreq), lrsigma, iunsigma, irec, 1)
-      END DO ! ifreq
-      !
-      CALL sigma_io_write_c(output%unit_sigma, ikpt, sigma_root)
+      element%variable = var_corr
+      element%access_index = ikpt
+      CALL calc%data%write_element(element, ierr)
+      CALL errore(__FILE__, "Error writing correlation self energy", ierr)
       !
     END IF ! ionode
+    IF (ALLOCATED(calc%data%corr)) DEALLOCATE(calc%data%corr)
     CALL stop_clock(time_sigma_io)
 
     CALL stop_clock(time_sigma_c)

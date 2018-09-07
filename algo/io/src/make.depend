@@ -1,2 +1,2 @@
+gw_container.o : gw_data.o
 openfilq.o : save_gw_input.o
-opengwfil.o : sigma_io.o

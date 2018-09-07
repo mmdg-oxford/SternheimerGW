@@ -37,7 +37,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   USE control_flags,        ONLY : restart, lkpoint_dir, iverbosity, twfcollect
   USE control_gw,           ONLY : maxter, alpha_mix, reduce_io, tr2_gw, niter_gw, &
                                    lmax_gw, tr2_green, lmax_green, nmix_gw, ldisp, &
-                                   tmp_dir_gw, tmp_dir_coul, eta, do_coulomb, do_sigma_c, &
+                                   tmp_dir_gw, eta, do_coulomb, do_sigma_c, &
                                    do_sigma_exx, do_sigma_matel, do_q0_only, maxter_green, &
                                    maxter_coul, model_coul, &
                                    solve_direct, do_epsil, set_alpha_pv, &
@@ -286,7 +286,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   output_t%pp_im_corr_iw%filename = ''
   output_t%pp_spec%filename       = ''
   output_t%pp_spec_iw%filename    = ''
-  output_t%file_sigma             = output%file_sigma
+  output_t%file_data              = output%file_data
 
 ! if corr_conv not set in input file default to the full
 ! correlation cutoff.
@@ -421,11 +421,10 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   !
   tmp_dir_save=tmp_dir
   tmp_dir_gw= TRIM (tmp_dir) //'_gw'//trim(int_to_char(my_image_id))//'/'
-  tmp_dir_coul= TRIM (tmp_dir) //'_gw0'//'/'
 
   ! set output directory if not defined
   IF (output_t%directory == '') THEN
-    output_t%directory = trimcheck(tmp_dir_gw)
+    output_t%directory = trimcheck(tmp_dir)
   ELSE
     output_t%directory = trimcheck(output%directory)
   END IF
@@ -436,7 +435,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   IF (ierr > 0) CALL errore(__FILE__, "error when opening/creating directory for output", ierr)
 
   ! augment sigma file with output directory
-  output_t%file_sigma = TRIM(output_t%directory) // output_t%file_sigma
+  output_t%file_data = TRIM(output_t%directory) // output_t%file_data
 
   CALL check_tempdir ( tmp_dir_gw, exst, parallelfs )
 

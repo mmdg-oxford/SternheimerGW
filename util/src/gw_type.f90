@@ -93,7 +93,7 @@ MODULE gw_type_mod
 
     ! file for exchange and correlation part of sigma
     INTEGER unit_sigma
-    CHARACTER(LEN=name_length) file_sigma
+    CHARACTER(LEN=name_length) file_data
 
   END TYPE output_type
 

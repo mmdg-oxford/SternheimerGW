@@ -48,7 +48,7 @@ structure = {
     depend: ["base", "util", "data"],
   },
   "io": {
-    depend: ["base", "pw", "lrmods", "util", "grid"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "grid"],
   },
   "linear_solver": {
     depend: ["base", "pw", "lrmods", "util", "data"]
@@ -69,7 +69,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "util"],
   },
   "teardown": {
-    depend: ["base", "pw", "lrmods", "util", "data"],
+    depend: ["base", "pw", "lrmods", "util", "data", "io"],
   },
   "truncation": {
     depend: ["base", "util"],
@@ -77,19 +77,22 @@ structure = {
 },
 "phys": {
   "corr": {
-    depend: ["base", "pw", "vendor", "util", "data", "algo", "coul", "green"],
+    depend: ["base", "pw", "vendor", "util", "data", "algo", "driver", "coul", "green"],
   },
   "coul": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo", "postproc"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "postproc", "driver"],
+  },
+  "driver": {
+    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
   },
   "exch": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
   },
   "green": {
     depend: ["base", "pw", "util", "data", "algo"],
   },
   "matrix_el": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
   },  
   "postproc": {
     depend: ["base", "vendor", "algo"],

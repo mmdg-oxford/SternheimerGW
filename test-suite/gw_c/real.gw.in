@@ -46,6 +46,7 @@
 /
 
 &gw_output
+  directory = 'test_out'
 /
 
 FREQUENCIES

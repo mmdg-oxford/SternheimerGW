@@ -25,16 +25,21 @@ include $(ESPRESSO)/make.inc
 
 LIB = libvendor.a
 
-all: .analytic module $(LIB)
+all: .analytic .container module $(LIB)
 
 .analytic:
 	ln -f -s -t analytic $(ESPRESSO)/make.inc
 	make -C analytic/src
 	touch $@
 
+.container:
+	ln -f -s -t container/f90_src $(ESPRESSO)/make.inc
+	make -C container
+	touch $@
+
 module:
 	mkdir -p $@
-	for file in $$(ls */src/*mod); do \
+	for file in $$(ls */*src/*mod); do \
 	  mod=$$(basename $$file); \
 	  ln -s $(CURDIR)/$$file; \
 	  mv $$mod $@/$$mod; \
@@ -42,10 +47,11 @@ module:
 
 $(LIB):
 	rm -f $@
-	$(AR) -rcT $@ */src/lib*.a
+	$(AR) -rcT $@ */*src/lib*.a
 
 clean:
 	make -C analytic/src clean ; rm -f .analytic
+	make -C container ; rm -f .container
 	rm -f module/*.mod
 	rm -f $(LIB)
 	

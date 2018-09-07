@@ -82,7 +82,7 @@ MODULE control_gw
   REAL(DP) :: alpha_mix(maxter)
   ! the mixing parameter
   !
-  CHARACTER(LEN=256) :: tmp_dir_gw, tmp_dir_coul
+  CHARACTER(LEN=256) :: tmp_dir_gw
   ! output directory
   !
   INTEGER :: truncation

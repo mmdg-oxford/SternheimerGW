@@ -22,7 +22,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-SUBROUTINE clean_pw_gw(flag)
+SUBROUTINE clean_pw_gw()
   !-----------------------------------------------------------------------
   !
   ! This routine deallocates all the variables of pwscf and of the
@@ -30,24 +30,16 @@ SUBROUTINE clean_pw_gw(flag)
   ! gwq_readin, so that it is possible to start a calculation at
   ! a new q.
   !
-  USE control_flags,   ONLY : twfcollect
-  USE lr_symm_base,    ONLY : nsymq
+  USE buffers,      ONLY: close_buffer
+  USE lr_symm_base, ONLY: nsymq
+  USE units_gw,     ONLY: iuwfc, iubar
   !
   IMPLICIT NONE
   !
-  LOGICAL :: flag
-  !
-  twfcollect=.FALSE. 
-
-  CALL clean_pw( .FALSE. )
-
+  CALL clean_pw(.FALSE.)
   CALL deallocate_gwq()
   nsymq = 0
+  CALL close_buffer(iuwfc, 'delete')
+  CALL close_buffer(iubar, 'delete')
   !
-  ! ... Close the files
-  !
-  CALL close_gwq( flag )
-  !
-  !
-RETURN
 END SUBROUTINE clean_pw_gw

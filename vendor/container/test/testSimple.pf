@@ -1,0 +1,297 @@
+! This Source Code Form is subject to the terms of the Mozilla Public
+! License, v. 2.0. If a copy of the MPL was not distributed with this
+! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+MODULE testSimple
+
+  USE pfunit_mod
+  USE container_interface
+  USE simple
+  IMPLICIT NONE
+
+CONTAINS
+
+  FUNCTION unique_filename(line, cpu)
+    !
+    CHARACTER(:), ALLOCATABLE :: unique_filename
+    INTEGER, INTENT(IN) :: line, cpu
+    CHARACTER(RANGE(line) + 2) :: line_str
+    CHARACTER(RANGE(cpu) + 2) :: cpu_str
+    WRITE(line_str,'(i0)') line
+    WRITE(cpu_str,'(i0)') cpu
+    unique_filename = 'simple_line_' // TRIM(line_str) // &
+                      '_#cpu_' // TRIM(cpu_str) // '.io'
+    !
+  END FUNCTION unique_filename
+
+  FUNCTION default_config(comm, filename)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: comm
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    TYPE(configuration) :: default_config
+    !
+    default_config%communicator = comm
+    default_config%filename = filename
+    default_config%mode = MPI_MODE_CREATE + MPI_MODE_RDWR
+    !
+  END FUNCTION default_config
+
+  SUBROUTINE delete_file(rank, filename)
+    !
+    INTEGER, INTENT(IN) :: rank
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    INTEGER iunit, ierr
+    IF (rank == 0) THEN
+      OPEN(NEWUNIT=iunit, FILE=filename, STATUS='old', IOSTAT=ierr)
+      IF (ierr == no_error) CLOSE(iunit, STATUS='delete')
+    END IF
+    !
+  END SUBROUTINE delete_file
+
+  SUBROUTINE set_reference(reference)
+    !
+    TYPE(simple_container), INTENT(INOUT) :: reference
+    INTEGER, PARAMETER :: first_dim = 10, second_dim = 8
+    INTEGER ii, jj, counter
+    !
+    ALLOCATE(reference%array(first_dim, second_dim))
+    counter = 0
+    DO jj = 1, second_dim
+      DO ii = 1, first_dim
+        reference%array(ii, jj) = counter
+        counter = counter + 1
+      END DO
+    END DO
+    !
+  END SUBROUTINE set_reference
+
+  SUBROUTINE write_reference(rank, filename, reference)
+    !
+    INCLUDE 'mpif.h'
+    INTEGER, INTENT(IN) :: rank
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    TYPE(simple_container), INTENT(OUT) :: reference
+    TYPE(configuration) config
+    INTEGER ierr
+    !
+    IF (rank == 0) THEN
+      config = default_config(MPI_COMM_SELF, filename)
+      CALL reference%open(config, ierr)
+      CALL set_reference(reference)
+      CALL reference%write(ierr)
+      @assertEqual(no_error, ierr)
+      CALL reference%close(ierr)
+    ELSE
+      CALL set_reference(reference)
+    END IF
+    !
+  END SUBROUTINE write_reference
+
+  @test(npes=[1,2,3,4])
+  SUBROUTINE test_open_close(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) container
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    @assertFalse(container%valid)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL container%open(config, ierr)
+    @assertEqual(no_error, ierr)
+    @assertTrue(container%valid)
+    CALL container%close(ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(container%valid)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_open_close
+
+  @test(npes=[1])
+  SUBROUTINE test_read_container(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    CALL sample%read(ierr)
+    CALL sample%close(ierr)
+    @assertEqual(no_error, ierr)
+    @assertEqual(ref%array, sample%array)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_read_container
+
+  @test(npes=[1,2])
+  SUBROUTINE test_error_invalid(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) sample
+    INTEGER ierr
+    !
+    CALL sample%write(ierr)
+    @assertEqual(file_not_open_error, ierr)
+    CALL sample%read(ierr)
+    @assertEqual(file_not_open_error, ierr)
+    !
+  END SUBROUTINE test_error_invalid
+
+  @test(npes=[1,2])
+  SUBROUTINE test_read_parallel(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    CALL sample%read_all(ierr)
+    @assertEqual(no_error, ierr)
+    @assertEqual(ref%array, sample%array)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_read_parallel
+
+  @test(npes=[3,4])
+  SUBROUTINE test_read_element(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(element_type) element
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr, ielem, first_elem, num_elem, step_elem
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    first_elem = this%getProcessRank() + 1
+    num_elem = SIZE(ref%array, 2)
+    step_elem = this%getNumProcesses()
+    element%variable = var_array
+    DO ielem = first_elem, num_elem, step_elem
+      element%access_index = ielem
+      CALL sample%read_element(element, ierr)
+      @assertEqual(no_error, ierr)
+      @assertEqual(ref%array(:,ielem), sample%array(:,1))
+    END DO
+    CALL sample%close(ierr)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_read_element
+
+  @test(npes=[1,3])
+  SUBROUTINE test_write_element(this)
+    !
+    INCLUDE 'mpif.h'
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(element_type) element
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr, ielem, first_elem, num_elem, step_elem
+    INTEGER(KIND=MPI_OFFSET_KIND) next_offset
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL set_reference(ref)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    ALLOCATE(sample%array(SIZE(ref%array, 1), 1))
+    first_elem = this%getProcessRank() + 1
+    num_elem = SIZE(ref%array, 2)
+    step_elem = this%getNumProcesses()
+    element%variable = var_array
+    element%access_index = first_elem
+    CALL sample%write_element(element, ierr)
+    @assertEqual(dimension_not_set_error, ierr)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    !
+    CALL sample%write_dimension(element%variable, [SIZE(ref%array, 1), num_elem], ierr)
+    @assertEqual(no_error, ierr)
+    DO ielem = first_elem, num_elem, step_elem
+      element%access_index = ielem
+      sample%array = ref%array(:, ielem:ielem)
+      CALL sample%write_element(element, ierr)
+      @assertEqual(no_error, ierr)
+    END DO
+    CALL MPI_ALLREDUCE(sample%offset(1), next_offset, 1, MPI_OFFSET, &
+      MPI_MAX, this%getMpiCommunicator(), ierr)
+    @assertEqual(next_offset, sample%offset(1))
+    CALL sample%read_all(ierr)
+    @assertEqual(no_error, ierr)
+    CALL sample%close(ierr)
+    @assertEqual(ref%array, sample%array)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_write_element
+
+  @test(npes=[1,4])
+  SUBROUTINE test_read_dimension(this)
+    !
+    INCLUDE 'mpif.h'
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER, ALLOCATABLE :: dims(:)
+    INTEGER ierr
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    CALL sample%read_dimension(var_array, dims, ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(ALLOCATED(dims))
+    CALL sample%close(ierr)
+    !
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    CALL MPI_BARRIER(this%getMpiCommunicator(), ierr)
+    CALL sample%open(config, ierr)
+    CALL sample%read_dimension(var_array, dims, ierr)
+    @assertEqual(no_error, ierr)
+    @assertFalse(ALLOCATED(sample%array))
+    @assertEqual(SHAPE(ref%array), dims)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_read_dimension
+
+  @test(npes=[1])
+  SUBROUTINE test_read_out_of_bounds(this)
+    !
+    CLASS(MpiTestMethod), INTENT(INOUT) :: this
+    TYPE(simple_container) ref, sample
+    TYPE(element_type) element
+    TYPE(configuration) config
+    CHARACTER(:), ALLOCATABLE :: filename
+    INTEGER ierr, num_elem
+    !
+    filename = unique_filename(__LINE__, this%getNumProcesses())
+    CALL write_reference(this%getProcessRank(), filename, ref)
+    num_elem = SIZE(ref%array, 2)
+    config = default_config(this%getMpiCommunicator(), filename)
+    CALL sample%open(config, ierr)
+    element%variable = var_array
+    element%access_index = num_elem + 1
+    CALL sample%read_element(element, ierr)
+    @assertEqual(out_of_bounds_error, ierr)
+    CALL delete_file(this%getProcessRank(), filename)
+    !
+  END SUBROUTINE test_read_out_of_bounds
+
+END MODULE testSimple

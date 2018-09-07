@@ -301,16 +301,19 @@ CONTAINS
 
   !> Extract the necessary quantities and evaluate the exchange according
   !! to the following algorithm.
-  SUBROUTINE exchange_wrapper(ikpt, grid, vcut)
+  SUBROUTINE exchange_wrapper(ikpt, calc)
 
     USE buffers,            ONLY: get_buffer
     USE cell_base,          ONLY: tpiba, at, omega
     USE constants,          ONLY: degspin
-    USE control_gw,         ONLY: output, truncation
+    USE control_gw,         ONLY: truncation
     USE control_lr,         ONLY: nbnd_occ 
-    USE disp,               ONLY: xk_kpoints
+    USE container_interface,ONLY: element_type
+    USE disp,               ONLY: xk_kpoints, num_k_pts
+    USE driver,             ONLY: calculation
     USE eqv,                ONLY: evq
     USE gvect,              ONLY: mill
+    USE gw_data,            ONLY: var_exch
     USE io_global,          ONLY: meta_ionode
     USE kinds,              ONLY: dp
     USE klist,              ONLY: xk, igk_k, ngk
@@ -318,9 +321,7 @@ CONTAINS
     USE mp_pools,           ONLY: inter_pool_comm, root_pool
     USE parallel_module,    ONLY: parallel_task, mp_root_sum
     USE qpoint,             ONLY: nksq, ikqs, npwq
-    USE sigma_grid_module,  ONLY: sigma_grid_type
-    USE sigma_io_module,    ONLY: sigma_io_write_x
-    USE units_gw,           ONLY: iunsex, lrsex, iuwfc, lrwfc
+    USE units_gw,           ONLY: iuwfc, lrwfc
     USE wvfct,              ONLY: wg
     USE timing_module,      ONLY: time_sigma_x
     USE truncation_module,  ONLY: vcut_type
@@ -328,11 +329,10 @@ CONTAINS
     !> The index of the k-point for which the exchange is evaluated
     INTEGER, INTENT(IN) :: ikpt
 
-    !> the FFT grid for exchange
-    TYPE(sigma_grid_type), INTENT(IN) :: grid
+    !> the data produced by the GW calculation
+    TYPE(calculation), INTENT(INOUT) :: calc
 
-    !> The truncated Coulomb potential
-    TYPE(vcut_type), INTENT(IN) :: vcut
+    TYPE(element_type) element
 
     !> temporary array to distribute the work
     INTEGER, ALLOCATABLE :: num_task(:)
@@ -358,9 +358,6 @@ CONTAINS
     !> the truncated Coulomb potential
     REAL(dp),    ALLOCATABLE :: coulomb(:)
 
-    !> the exchange self-energy
-    COMPLEX(dp), ALLOCATABLE :: sigma(:,:)
-
     !> status of allocation
     INTEGER ierr
 
@@ -370,9 +367,9 @@ CONTAINS
     CALL start_clock(time_sigma_x)
 
     ! allocate array for self energy and initialize to 0
-    ALLOCATE(sigma(grid%exch_fft%ngm, grid%exch_fft%ngm), STAT=ierr)
+    ALLOCATE(calc%data%exch(calc%grid%exch_fft%ngm, calc%grid%exch_fft%ngm, 1), STAT=ierr)
     CALL errore(__FILE__, "error allocating array for exchange self energy", ierr)
-    sigma = zero
+    calc%data%exch = zero
 
     !!
     !! 1. Extract the wave function of every q-point
@@ -391,19 +388,19 @@ CONTAINS
       !!
       !! 3. construct the map from G and G' to G - G'
       !!
-      CALL exchange_map(at, grid, mill, igk_k(:,ikq), map)
+      CALL exchange_map(at, calc%grid, mill, igk_k(:,ikq), map)
       !!
       !! 4. construct the Coulomb potential
       !!
       ! q = k - (k - q)
       qvec = xk_kpoints(:, ikpt) - xk(:, ikq)
-      CALL exchange_coulomb(tpiba, truncation, vcut, grid, qvec, coulomb)
+      CALL exchange_coulomb(tpiba, truncation, calc%vcut, calc%grid, qvec, coulomb)
       !!
       !! 5. every process evaluates his contribution to sigma
       !!
       DO iband = iband_start, iband_stop
         !
-        CALL exchange_convolution(wg(iband, ikq) / degspin, coulomb, evq(:,iband), map, sigma)
+        CALL exchange_convolution(wg(iband, ikq) / degspin, coulomb, evq(:,iband), map, calc%data%exch(:,:,1))
         !
       END DO ! iband
       !
@@ -412,22 +409,23 @@ CONTAINS
     !!
     !! 6. collect the self-energy on the root process
     !!
-    CALL mp_root_sum(inter_image_comm, root_image, sigma)
-    CALL mp_root_sum(inter_pool_comm,  root_pool,  sigma)
+    CALL mp_root_sum(inter_image_comm, root_image, calc%data%exch)
+    CALL mp_root_sum(inter_pool_comm,  root_pool,  calc%data%exch)
 
     !!
     !! 7. write the self-energy to file
     !!
     IF (meta_ionode) THEN
       !
-      sigma = sigma / omega
-      ! write unformatted
-      CALL davcio(sigma, lrsex, iunsex, ikpt, 1)
-      ! write formatted
-      CALL sigma_io_write_x(output%unit_sigma, ikpt, sigma)
+      calc%data%exch = calc%data%exch / omega
+      element%variable = var_exch
+      element%access_index = ikpt
+      CALL calc%data%write_element(element, ierr)
+      CALL errore(__FILE__, "Error writing exchange self energy", ierr)
       !
     END IF ! meta_ionode
 
+    DEALLOCATE(calc%data%exch)
     CALL stop_clock(time_sigma_x)
 
   END SUBROUTINE exchange_wrapper

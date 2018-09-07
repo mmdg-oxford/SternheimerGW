@@ -23,14 +23,16 @@
 
 include ../../../module
 include $(ESPRESSO)/make.inc
+.DEFAULT_GOAL = all
 
 SRC = $(wildcard *.f90)
 OBJ = $(SRC:.f90=.o)
 LIB = lib@LIB@.a
+-include make.ext
 
 MODFLAGS =@MOD@
 
-all: lib mod
+all: $(EXTERN) lib mod
 
 lib: $(LIB)
 
