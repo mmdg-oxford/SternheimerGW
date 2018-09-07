@@ -280,12 +280,6 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   output_t%pp_vxc%filename        = output%file_vxc
   output_t%pp_exchange%filename   = output%file_hf
   output_t%pp_renorm%filename     = output%file_renorm
-  output_t%pp_re_corr%filename    = ''
-  output_t%pp_re_corr_iw%filename = ''
-  output_t%pp_im_corr%filename    = ''
-  output_t%pp_im_corr_iw%filename = ''
-  output_t%pp_spec%filename       = ''
-  output_t%pp_spec_iw%filename    = ''
   output_t%file_data              = output%file_data
 
 ! if corr_conv not set in input file default to the full
