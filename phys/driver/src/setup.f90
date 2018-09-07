@@ -20,7 +20,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------
-MODULE setup
+MODULE setup_module
 
   IMPLICIT NONE
 
@@ -94,4 +94,4 @@ CONTAINS
     !
   END SUBROUTINE determine_dimension
 
-END MODULE setup
+END MODULE setup_module

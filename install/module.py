@@ -83,7 +83,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "postproc", "driver"],
   },
   "driver": {
-    depend: ["base", "pw", "lrmods", "util", "data", "algo"],
+    depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo"],
   },
   "exch": {
     depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
