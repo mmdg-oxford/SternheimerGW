@@ -4,6 +4,9 @@ Release notes
 on develop
 ----------
 
+Include new container I/O library to replace the use of the deprecated
+IOTK library.
+
 > compatible QE commit 5d111a0
 
 Version 0.15
