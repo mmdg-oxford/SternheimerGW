@@ -32,13 +32,14 @@ CONTAINS
   SUBROUTINE setup_calculation(calc)
     !
     USE check_stop,        ONLY: check_stop_init
-    USE control_gw,        ONLY: do_imag
+    USE control_gw,        ONLY: do_imag, output
     USE environment,       ONLY: environment_start
     USE freq_gw,           ONLY: nwsigma, nwsigwin, wsigmamin, wsigmamax, wcoulmax, nwcoul, &
                                  wsig_wind_min, wsig_wind_max, nwsigwin
     USE freqbins_module,   ONLY: freqbins
     USE driver,            ONLY: calculation
-    USE gw_container,      ONLY: open_container, consistent_dimension, write_dimension, gw_dimension
+    USE gw_container,      ONLY: open_container, write_k_point, backup, &
+                                 consistent_dimension, write_dimension, gw_dimension
     USE gw_opening,        ONLY: gw_opening_logo, gw_opening_message
     USE gwsigma,           ONLY: ecutsco, ecutsex
     USE mp_global,         ONLY: mp_startup
@@ -65,10 +66,11 @@ CONTAINS
     CALL freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
-    CALL open_container(calc%data)
+    CALL open_container(output%file_data, calc%data)
+    CALL write_k_point(calc%data)
     CALL determine_dimension(calc, dims)
     backup_needed = .NOT.consistent_dimension(calc%data, dims)
-    IF (backup_needed) WRITE(*,*) 'backup not implemented yet' !CALL backup(calc%data)
+    IF (backup_needed) CALL backup(calc%data)
     CALL write_dimension(calc%data, dims)
     CALL stop_clock(time_setup)
     !
