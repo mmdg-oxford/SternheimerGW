@@ -63,8 +63,8 @@ SUBROUTINE openfilq()
   !
   !    The file with deltaV_{bare} * psi
   !
+  iubar = 21
   IF (do_coulomb.AND..NOT.solve_direct) THEN
-    iubar = 21
     lrbar = nbnd * npwx * npol
     CALL open_buffer(iubar, 'bar', lrbar, io_level, exst_mem, exst, tmp_dir)
   END IF
