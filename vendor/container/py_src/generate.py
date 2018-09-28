@@ -26,16 +26,16 @@ def license_info():
   """.strip('\n'))
 
 def module_header(file_description):
-  type_name = '{}_container'.format(file_description['name'])
+  type_name = '{0}_container'.format(file_description['name'])
   type_string = ''
   for key in file_description:
       if key == 'name': continue
       dim_string = "(:" + ",:" * (file_description[key]['dim'] - 1) + ")"
-      type_string += "\n    {}, ALLOCATABLE :: {}".format(
+      type_string += "\n    {0}, ALLOCATABLE :: {1}".format(
         file_description[key]['type'].upper(), key + dim_string)
-  var_name = ['var_{}'.format(key) for key in file_description if key != 'name']
+  var_name = ['var_{0}'.format(key) for key in file_description if key != 'name']
   public_string = ', '.join(var_name + [type_name])
-  enum_string = 'ENUMERATOR :: {} = 1'.format(var_name[0])
+  enum_string = 'ENUMERATOR :: {0} = 1'.format(var_name[0])
   if len(var_name) > 1:
       enum_string += '\n    ENUMERATOR ' + ', '.join(var_name[1:])
   return """MODULE {0}
@@ -63,7 +63,7 @@ def module_header(file_description):
 
 """.format(file_description['name'], public_string, enum_string, type_name, type_string)
 
-  type_string = """  TYPE {}
+  type_string = """  TYPE {0}
     INTEGER filehandle
     LOGICAL :: valid = .FALSE.
 """.format(type_name)
@@ -84,15 +84,15 @@ def module_body(file_description):
   return body
 
 def module_footer(name):
-  return "\nEND MODULE {}\n".format(name)
+  return "\nEND MODULE {0}\n".format(name)
 
 def init(file_description):
   dim = [file_description[key]['dim'] for key in file_description if key != 'name']
   return """
   SUBROUTINE init(container)
     !
-    CLASS({}_container), INTENT(OUT) :: container
-    container%num_dim = {}
+    CLASS({0}_container), INTENT(OUT) :: container
+    container%num_dim = {1}
     !
   END SUBROUTINE init
 """.format(file_description['name'], dim)
@@ -118,11 +118,11 @@ def write_variable(file_description):
   SUBROUTINE write_variable(container, config, ierr)
     !
     INCLUDE 'mpif.h'
-    CLASS({}_container), INTENT(INOUT) :: container
+    CLASS({0}_container), INTENT(INOUT) :: container
     TYPE(internal_config), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
     !
-    SELECT CASE (config%variable){}
+    SELECT CASE (config%variable){1}
     END SELECT
     !
   END SUBROUTINE write_variable
@@ -144,14 +144,14 @@ def write_element(file_description):
   SUBROUTINE write_element(container, config, ierr)
     !
     INCLUDE 'mpif.h'
-    CLASS({}_container), INTENT(INOUT) :: container
+    CLASS({0}_container), INTENT(INOUT) :: container
     TYPE(internal_config), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
     dims = config%dimension
     dims(SIZE(dims)) = config%access_index - 1
-    SELECT CASE (config%variable){}
+    SELECT CASE (config%variable){1}
     END SELECT
     !
   END SUBROUTINE write_element
@@ -173,14 +173,14 @@ def read_variable(file_description):
   SUBROUTINE read_variable(container, mpi_func, config, ierr)
     !
     INCLUDE 'mpif.h'
-    CLASS({}_container), INTENT(INOUT) :: container
+    CLASS({0}_container), INTENT(INOUT) :: container
     EXTERNAL mpi_func
     TYPE(internal_config), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
     dims = config%dimension
-    SELECT CASE (config%variable){}
+    SELECT CASE (config%variable){1}
     END SELECT
     !
   END SUBROUTINE read_variable
@@ -189,7 +189,7 @@ def read_variable(file_description):
 def _dim_string_variable(dim):
   dim_string = ''
   for i in range(dim):
-    dim_string += 'dims({}), '.format(i + 1)
+    dim_string += 'dims({0}), '.format(i + 1)
   return dim_string.strip(', ')
 
 def read_element(file_description):
@@ -210,7 +210,7 @@ def read_element(file_description):
   SUBROUTINE read_element(container, mpi_func, config, ierr)
     !
     INCLUDE 'mpif.h'
-    CLASS({}_container), INTENT(INOUT) :: container
+    CLASS({0}_container), INTENT(INOUT) :: container
     EXTERNAL mpi_func
     TYPE(internal_config), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
@@ -218,7 +218,7 @@ def read_element(file_description):
     !
     dims = config%dimension
     dims(SIZE(dims)) = config%access_index - 1
-    SELECT CASE (config%variable){}
+    SELECT CASE (config%variable){1}
     END SELECT
     !
   END SUBROUTINE read_element
@@ -230,18 +230,18 @@ def update_offset(file_description):
     if key == 'name': continue
     mpi_type = _mpi_type(file_description[key]['type'])
     offset_string += """
-    CASE (var_{})
-      CALL container%increase_offset(dimension, {}, ierr)""".format(key, mpi_type)
+    CASE (var_{0})
+      CALL container%increase_offset(dimension, {1}, ierr)""".format(key, mpi_type)
   return """
   SUBROUTINE update_offset(container, variable, dimension, ierr)
     !
     INCLUDE 'mpif.h'
-    CLASS({}_container), INTENT(INOUT) :: container
+    CLASS({0}_container), INTENT(INOUT) :: container
     INTEGER, INTENT(IN) :: variable, dimension(:)
     INTEGER, INTENT(OUT) :: ierr
     INTEGER(KIND=MPI_OFFSET_KIND) offset
     !
-    SELECT CASE (variable){}
+    SELECT CASE (variable){1}
     END SELECT
     IF (ierr /= no_error) RETURN
     CALL container%update_offset(ierr)
@@ -252,7 +252,7 @@ def update_offset(file_description):
 def _dim_string_element(dim):
   dim_string = ''
   for i in range(dim - 1):
-    dim_string += 'dims({}), '.format(i + 1)
+    dim_string += 'dims({0}), '.format(i + 1)
   return dim_string + "1"
 
 def _mpi_type(fortran_type):
