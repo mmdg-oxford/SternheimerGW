@@ -92,7 +92,7 @@ def init(file_description):
   SUBROUTINE init(container)
     !
     CLASS({0}_container), INTENT(OUT) :: container
-    container%num_dim = {1}
+    CALL allocate_copy_from_to({1}, container%num_dim)
     !
   END SUBROUTINE init
 """.format(file_description['name'], dim)
@@ -149,7 +149,7 @@ def write_element(file_description):
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     dims(SIZE(dims)) = config%access_index - 1
     SELECT CASE (config%variable){1}
     END SELECT
@@ -179,7 +179,7 @@ def read_variable(file_description):
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     SELECT CASE (config%variable){1}
     END SELECT
     !
@@ -216,7 +216,7 @@ def read_element(file_description):
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     dims(SIZE(dims)) = config%access_index - 1
     SELECT CASE (config%variable){1}
     END SELECT

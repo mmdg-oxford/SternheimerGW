@@ -23,7 +23,8 @@ MODULE container_interface
   PRIVATE
   PUBLIC no_error, file_not_open_error, out_of_bounds_error, &
     generic_routine_called_error, dimension_change_error, dimension_not_set_error, &
-    dp, configuration, element_type, container_type, internal_config
+    dp, configuration, element_type, container_type, internal_config, &
+    allocate_copy_from_to
 
   INTEGER, PARAMETER :: dp = SELECTED_REAL_KIND(15, 307)
 
@@ -77,9 +78,12 @@ MODULE container_interface
     PROCEDURE :: read_element
     PROCEDURE :: read_dimension
     PROCEDURE :: num_variable
+    PROCEDURE :: open_file
     PROCEDURE :: check
     PROCEDURE :: check_dimension
     PROCEDURE :: check_config
+    PROCEDURE :: init_offset
+    PROCEDURE :: file_empty
     PROCEDURE :: next_offset
     PROCEDURE :: set_next_offset
     PROCEDURE :: seek_offset
@@ -107,21 +111,11 @@ CONTAINS
     CLASS(container_type), INTENT(OUT) :: container
     TYPE(configuration), INTENT(IN) :: config
     INTEGER, INTENT(OUT) :: ierr
-    INTEGER(KIND=MPI_OFFSET_KIND) num_offset
-    INTEGER size_offset
     !
     CALL container%internal_init()
-    !
-    CALL MPI_TYPE_SIZE(MPI_OFFSET, size_offset, ierr)
+    CALL container%open_file(config, ierr)
     IF (ierr /= no_error) RETURN
-    num_offset = container%num_variable() + 1
-    ALLOCATE(container%offset(num_offset))
-    container%offset = not_set
-    CALL container%set_next_offset(num_offset * size_offset)
-    !
-    CALL MPI_FILE_OPEN(config%communicator, config%filename, config%mode, &
-      MPI_INFO_NULL, container%filehandle, ierr)
-    container%valid = (ierr == no_error)
+    CALL container%init_offset(ierr)
     !
   END SUBROUTINE open
 
@@ -328,12 +322,35 @@ CONTAINS
     !
   END SUBROUTINE read_dimension
 
+  !> Allocate copy of integer vector
+  SUBROUTINE allocate_copy_from_to(original, copy)
+    !
+    INTEGER, INTENT(IN) :: original(:)
+    INTEGER, INTENT(OUT), ALLOCATABLE :: copy(:)
+    !
+    ALLOCATE(copy(SIZE(original)))
+    copy = original
+    !
+  END SUBROUTINE allocate_copy_from_to
+
   PURE INTEGER FUNCTION num_variable(container)
     !
     CLASS(container_type), INTENT(IN) :: container
     num_variable = SIZE(container%num_dim)
     !
   END FUNCTION num_variable
+
+  SUBROUTINE open_file(container, config, ierr)
+    !
+    CLASS(container_type), INTENT(INOUT) :: container
+    TYPE(configuration), INTENT(IN) :: config
+    INTEGER, INTENT(OUT) :: ierr
+    !
+    CALL MPI_FILE_OPEN(config%communicator, config%filename, config%mode, &
+      MPI_INFO_NULL, container%filehandle, ierr)
+    container%valid = (ierr == no_error)
+    !
+  END SUBROUTINE open_file
 
   SUBROUTINE check(container, ierr)
     !
@@ -379,6 +396,39 @@ CONTAINS
     END IF
     !
   END SUBROUTINE check_config
+
+  SUBROUTINE init_offset(container, ierr)
+    !
+    CLASS(container_type), INTENT(INOUT) :: container
+    INTEGER, INTENT(OUT) :: ierr
+    INTEGER num_offset
+    LOGICAL write_offset
+    !
+    num_offset = container%num_variable() + 1
+    ALLOCATE(container%offset(num_offset))
+    write_offset = container%file_empty(ierr)
+    IF (ierr /= no_error) RETURN
+    IF (write_offset) THEN
+      container%offset = not_set
+      CALL container%increase_offset(SHAPE(container%offset), MPI_OFFSET, ierr)
+      IF (ierr /= no_error) RETURN
+      CALL container%update_offset(ierr)
+    ELSE
+      CALL MPI_FILE_READ_AT(container%filehandle, offset_position, container%offset, &
+        SIZE(container%offset), MPI_OFFSET, MPI_STATUS_IGNORE, ierr)
+    END IF
+    !
+  END SUBROUTINE init_offset
+
+  LOGICAL FUNCTION file_empty(container, ierr)
+    !
+    CLASS(container_type), INTENT(IN) :: container
+    INTEGER, INTENT(OUT) :: ierr
+    INTEGER(KIND=MPI_OFFSET_KIND) size
+    CALL MPI_FILE_GET_SIZE(container%filehandle, size, ierr)
+    file_empty = size == 0
+    !
+  END FUNCTION file_empty
 
   INTEGER(KIND=MPI_OFFSET_KIND) FUNCTION next_offset(container)
     !
