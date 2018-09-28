@@ -78,6 +78,7 @@ CONTAINS
 
   SUBROUTINE determine_dimension(calc, dims)
     !
+    USE container_interface, ONLY: allocate_copy_from_to
     USE control_gw,   ONLY: do_sigma_c, do_sigma_exx
     USE driver,       ONLY: calculation
     USE gw_container, ONLY: gw_dimension
@@ -89,8 +90,10 @@ CONTAINS
     num_g_corr = calc%grid%corr_fft%ngm
     num_k_pts = SIZE(calc%data%k_point, 2)
     num_omega = calc%freq%num_sigma()
-    IF (do_sigma_exx) dims%exch = [num_g_exch, num_g_exch, num_k_pts]
-    IF (do_sigma_c) dims%corr = [num_g_corr, num_g_corr, num_omega, num_k_pts]
+    IF (do_sigma_exx) &
+      CALL allocate_copy_from_to([num_g_exch, num_g_exch, num_k_pts], dims%exch)
+    IF (do_sigma_c) &
+      CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_omega, num_k_pts], dims%corr)
     !
   END SUBROUTINE determine_dimension
 
