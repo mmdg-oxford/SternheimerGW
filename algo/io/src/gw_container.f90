@@ -67,7 +67,8 @@ CONTAINS
     TYPE(gw_data_container), INTENT(INOUT) :: data
     INTEGER ierr
     !
-    data%k_point = xk_kpoints(:,:num_k_pts)
+    ALLOCATE(data%k_point(3, num_k_pts))
+    data%k_point = xk_kpoints(1:3, 1:num_k_pts)
     CALL data%write_variable(var_k_point, ierr)
     CALL errore(__FILE__, "Error writing k points", ierr)
     !
