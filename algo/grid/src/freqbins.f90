@@ -375,7 +375,10 @@ CONTAINS
     IF (freq_in%freq_symm_coul == no_symmetry) THEN
       ALLOCATE(freq_out(num_freq))
       freq_out = freq_in%solver
-      IF (PRESENT(array_in)) array_out = array_in
+      IF (PRESENT(array_in)) THEN
+        ALLOCATE(array_out(SIZE(array_in,1), SIZE(array_in,2), SIZE(array_in,3)))
+        array_out = array_in
+      END IF
       RETURN
     END IF
 
@@ -383,7 +386,10 @@ CONTAINS
     IF (freq_in%freq_symm_coul == square_symmetry) THEN
       ALLOCATE(freq_out(num_freq))
       freq_out = freq_in%solver**2
-      IF (PRESENT(array_in)) array_out = array_in
+      IF (PRESENT(array_in)) THEN
+        ALLOCATE(array_out(SIZE(array_in,1), SIZE(array_in,2), SIZE(array_in,3)))
+        array_out = array_in
+      END IF
       RETURN
     END IF
 
