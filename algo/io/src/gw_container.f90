@@ -25,7 +25,7 @@ MODULE gw_container
   IMPLICIT NONE
 
   TYPE gw_dimension
-    INTEGER, ALLOCATABLE :: exch(:), corr(:)
+    INTEGER, ALLOCATABLE :: exch(:), corr(:), coul(:)
   END TYPE gw_dimension
 
   PUBLIC
@@ -76,16 +76,32 @@ CONTAINS
 
   LOGICAL FUNCTION consistent_dimension(data, dims)
     !
-    USE gw_data, ONLY: gw_data_container, var_exch, var_corr
+    USE control_gw, ONLY: do_coulomb, do_sigma_c, do_sigma_exx
+    USE gw_data,    ONLY: gw_data_container, var_exch, var_corr, var_coul
     TYPE(gw_data_container), INTENT(INOUT) :: data
     TYPE(gw_dimension), INTENT(IN) :: dims
     !
     consistent_dimension = .FALSE.
-    IF (ALLOCATED(dims%exch)) THEN
-      IF (.NOT.dimension_correct(data, var_exch, dims%exch)) RETURN
+    IF (.NOT.dimension_correct(data, var_coul, dims%coul)) THEN
+      IF (.NOT.do_coulomb) THEN
+        CALL errore(__FILE__, "dimension of coulomb inconsistent with datafile", var_coul)
+      ELSE
+        RETURN
+      END IF
     END IF
-    IF (ALLOCATED(dims%corr)) THEN
-      IF (.NOT.dimension_correct(data, var_corr, dims%corr)) RETURN
+    IF (.NOT.dimension_correct(data, var_exch, dims%exch)) THEN
+      IF (.NOT.do_sigma_exx) THEN
+        CALL errore(__FILE__, "dimension of exchange inconsistent with datafile", var_exch)
+      ELSE
+        RETURN
+      END IF
+    END IF
+    IF (.NOT.dimension_correct(data, var_corr, dims%corr)) THEN
+      IF (.NOT.do_sigma_c) THEN
+        CALL errore(__FILE__, "dimension of correlation inconsistent with datafile", var_corr)
+      ELSE
+        RETURN
+      END IF
     END IF
     consistent_dimension = .TRUE.
     !
@@ -111,19 +127,17 @@ CONTAINS
 
   SUBROUTINE write_dimension(data, dims)
     !
-    USE gw_data, ONLY: gw_data_container, var_exch, var_corr
+    USE gw_data, ONLY: gw_data_container, var_exch, var_corr, var_coul
     TYPE(gw_data_container), INTENT(INOUT) :: data
     TYPE(gw_dimension), INTENT(IN) :: dims
     INTEGER ierr
     !
-    IF (ALLOCATED(dims%exch)) THEN
-      CALL data%write_dimension(var_exch, dims%exch, ierr)
-      CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
-    END IF
-    IF (ALLOCATED(dims%corr)) THEN
-      CALL data%write_dimension(var_corr, dims%corr, ierr)
-      CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
-    END IF
+    CALL data%write_dimension(var_coul, dims%coul, ierr)
+    CALL errore(__FILE__, "Error writing dimension of coulomb", ierr)
+    CALL data%write_dimension(var_exch, dims%exch, ierr)
+    CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
+    CALL data%write_dimension(var_corr, dims%corr, ierr)
+    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
     !
   END SUBROUTINE write_dimension
 
