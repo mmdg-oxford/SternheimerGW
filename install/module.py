@@ -72,7 +72,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "util", "data", "io"],
   },
   "truncation": {
-    depend: ["base", "util"],
+    depend: ["base", "vendor", "util"],
   },
 },
 "phys": {
