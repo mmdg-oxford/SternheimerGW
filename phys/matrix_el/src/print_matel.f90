@@ -194,6 +194,7 @@ END SUBROUTINE print_matel
  !call errore ('qp_eigval','original eigenvalues outside the frequency range of the self-energy',1)
   write(6,'("original eigenvalues outside the frequency range of the self-energy")')
   write(6,'(3f7.2)') RYTOEV*et, RYTOEV*(w(1)+dw), RYTOEV*(w(nw) - dw)
+  et_qp = 0.0
  return
  endif
 

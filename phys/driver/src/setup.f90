@@ -20,7 +20,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------
-MODULE setup
+MODULE setup_module
 
   IMPLICIT NONE
 
@@ -78,20 +78,29 @@ CONTAINS
 
   SUBROUTINE determine_dimension(calc, dims)
     !
-    USE control_gw,   ONLY: do_sigma_c, do_sigma_exx
+    USE container_interface, ONLY: allocate_copy_from_to
+    USE control_gw,   ONLY: do_epsil
+    USE disp,         ONLY: nqs
     USE driver,       ONLY: calculation
     USE gw_container, ONLY: gw_dimension
     TYPE(calculation), INTENT(IN) :: calc
     TYPE(gw_dimension), INTENT(OUT) :: dims
-    INTEGER num_g_exch, num_g_corr, num_k_pts, num_omega
+    INTEGER num_g_exch, num_g_corr, num_k_pts, num_q_pts, num_freq_corr, num_freq_coul
     !
     num_g_exch = calc%grid%exch_fft%ngm
     num_g_corr = calc%grid%corr_fft%ngm
     num_k_pts = SIZE(calc%data%k_point, 2)
-    num_omega = calc%freq%num_sigma()
-    IF (do_sigma_exx) dims%exch = [num_g_exch, num_g_exch, num_k_pts]
-    IF (do_sigma_c) dims%corr = [num_g_corr, num_g_corr, num_omega, num_k_pts]
+    IF (do_epsil) THEN
+      num_q_pts = num_k_pts
+    ELSE
+      num_q_pts = nqs
+    END IF
+    num_freq_coul = SIZE(calc%freq%solver)
+    num_freq_corr = calc%freq%num_sigma()
+    CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_freq_coul, num_q_pts], dims%coul)
+    CALL allocate_copy_from_to([num_g_exch, num_g_exch, num_k_pts], dims%exch)
+    CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_freq_corr, num_k_pts], dims%corr)
     !
   END SUBROUTINE determine_dimension
 
-END MODULE setup
+END MODULE setup_module

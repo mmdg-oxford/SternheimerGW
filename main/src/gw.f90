@@ -35,7 +35,7 @@ PROGRAM gw
   USE io_global,            ONLY : meta_ionode
   USE pp_output_mod,        ONLY : pp_output_open_all
   USE run_nscf_module,      ONLY : run_nscf
-  USE setup,                ONLY : setup_calculation
+  USE setup_module,         ONLY : setup_calculation
   USE sigma_matel,          ONLY : matrix_element
   USE sigma_module,         ONLY : sigma_wrapper
   USE timing_module,        ONLY : time_setup

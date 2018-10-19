@@ -118,8 +118,6 @@ IMPLICIT NONE
     iq1 = w_of_q_start
     iq2 = num_k_pts
   ENDIF
-  CALL calc%data%write_dimension(var_coul, [num_g_corr, num_g_corr, nfs, iq2], ierr)
-  CALL errore(__FILE__, "Error writing dimension for Coulomb matrix", ierr)
     
   DO iq = iq1, iq2
     ! Perform head of dielectric matrix calculation.

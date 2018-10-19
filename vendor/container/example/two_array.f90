@@ -32,7 +32,7 @@ CONTAINS
   SUBROUTINE init(container)
     !
     CLASS(two_array_container), INTENT(OUT) :: container
-    container%num_dim = [1, 2]
+    CALL allocate_copy_from_to([1, 2], container%num_dim)
     !
   END SUBROUTINE init
 
@@ -76,7 +76,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     dims(SIZE(dims)) = config%access_index - 1
     SELECT CASE (config%variable)
     CASE (var_second)
@@ -102,7 +102,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     SELECT CASE (config%variable)
     CASE (var_second)
       IF (ALLOCATED(container%second)) DEALLOCATE(container%second)
@@ -127,7 +127,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: ierr
     INTEGER, ALLOCATABLE :: dims(:)
     !
-    dims = config%dimension
+    CALL allocate_copy_from_to(config%dimension, dims)
     dims(SIZE(dims)) = config%access_index - 1
     SELECT CASE (config%variable)
     CASE (var_second)

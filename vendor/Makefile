@@ -51,7 +51,7 @@ $(LIB):
 
 clean:
 	make -C analytic/src clean ; rm -f .analytic
-	make -C container ; rm -f .container
+	make -C container clean ; rm -f .container
 	rm -f module/*.mod
 	rm -f $(LIB)
 	

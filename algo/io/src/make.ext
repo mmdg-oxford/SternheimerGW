@@ -21,7 +21,12 @@
 #
 #------------------------------------------------------------------------------
 CONTAINER = gw_data.f90
-EXTERN = $(CONTAINER)
+SRC += $(CONTAINER)
+OBJ += $(CONTAINER:.f90=.o)
 
 $(CONTAINER): create_container_module.py
 	python $< > $@
+
+clean: clean_container
+clean_container:
+	rm -f $(CONTAINER)

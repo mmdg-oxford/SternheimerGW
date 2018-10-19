@@ -32,7 +32,7 @@ CONTAINS
     TYPE(configuration) :: default_config
     !
     default_config%communicator = comm
-    default_config%filename = 'two_array.io'
+    default_config%filename = filename
     default_config%mode = MPI_MODE_CREATE + MPI_MODE_RDWR
     !
   END FUNCTION default_config
