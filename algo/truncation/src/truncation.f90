@@ -288,6 +288,8 @@ CONTAINS
     USE iotk_module, ONLY: iotk_free_unit, iotk_open_write, iotk_open_read, &
                            iotk_write_dat, iotk_scan_dat, iotk_close_write, &
                            iotk_close_read
+    USE container_interface, ONLY: configuration
+    USE trunc_data,          ONLY: trunc_data_container
 
     !> the truncated Coulomb potential
     TYPE(vcut_type), INTENT(OUT) :: vcut
@@ -301,11 +303,12 @@ CONTAINS
     !> the directory to which the file is written
     CHARACTER(*),    INTENT(IN)  :: tmp_dir
 
+    TYPE(configuration) :: config 
+    TYPE(trunc_data_container) :: data_container
+    INTEGER ierr
+ 
     !> the name of the file in which vcut is stored
     CHARACTER(*),    PARAMETER   :: filename = 'vcut.xml'
-
-    !> the path to the file
-    CHARACTER(:),    ALLOCATABLE :: filepath
 
     !> the root tag used in the file
     CHARACTER(*),    PARAMETER   :: tag_root = 'TRUNC_COULOMB'
@@ -344,8 +347,8 @@ CONTAINS
     INTEGER nn(3)
 
     ! check if the file exists
-    filepath = TRIM(tmp_dir) // filename
-    INQUIRE(FILE = filepath, EXIST = lexist)
+    config%filename = TRIM(tmp_dir) // filename
+    INQUIRE(FILE = config%filename, EXIST = lexist)
 
     ! find a free unit
     CALL iotk_free_unit(iunit)
@@ -356,7 +359,7 @@ CONTAINS
     DO WHILE (lexist)
 
       ! open the file
-      CALL iotk_open_read(iunit, filepath, binary = .TRUE.)
+      CALL iotk_open_read(iunit, config%filename, binary = .TRUE.)
 
       ! read the energy cutoff and the unit cell
       CALL iotk_scan_dat(iunit, tag_cutoff, vcut%cutoff)
@@ -408,7 +411,9 @@ CONTAINS
     CALL vcut_init(vcut, super_cell, cutoff)
 
     ! open the file
-    CALL iotk_open_write(iunit, filepath, binary = .TRUE., root = tag_root)
+    CALL iotk_open_write(iunit, config%filename, binary = .TRUE., root = tag_root)
+    CALL data_container%open(config, ierr)
+    CALL errore(__FILE__, "Error opening truncation data container", ierr) 
 
     !
     ! write the vcut type to disk
@@ -424,6 +429,8 @@ CONTAINS
 
     ! close the file
     CALL iotk_close_write(iunit)
+    CALL data_container%close(ierr)
+    CALL errore(__FILE__, "Error closing truncation data container", ierr)
 
   END SUBROUTINE vcut_reinit
 
