@@ -117,8 +117,6 @@ CONTAINS
   !!
   SUBROUTINE pp_output_close(output)
 
-    USE iotk_module, ONLY: iotk_write_end, iotk_close_write
-
     TYPE(pp_output_type), INTENT(IN) :: output
 
     LOGICAL opnd
