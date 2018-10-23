@@ -44,6 +44,8 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
                                    do_imag, newgrid, double_grid, output_t => output, &
                                    plot_coul, method_truncation => truncation
   USE control_lr,           ONLY : lgamma, lrpa, alpha_pv
+  USE Coul_cut_2D,          ONLY : do_cutoff_2D
+  USE Coul_cut_2D_ph,       ONLY : cutoff_fact_qg
   USE debug_module,         ONLY : debug_type
   USE disp,                 ONLY : nq1, nq2, nq3, iq1, iq2, iq3, xk_kpoints, num_k_pts, & 
                                    w_of_q_start, w_of_k_start, w_of_k_stop
@@ -501,6 +503,9 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
     CALL vcut_info(stdout, vcut)
     !
   END IF ! vcut truncation methods
+
+  ! initialize 2d truncation if used
+  IF (do_cutoff_2D) call cutoff_fact_qg()
 
   !
   ! setup the linear solver

@@ -12,6 +12,7 @@ BN 2d film
     ntyp        = 2
     ecutwfc     = 30
     force_symmorphic = .true.
+    assume_isolated = '2D'
 /
 
 &electrons
@@ -25,7 +26,7 @@ ATOMIC_SPECIES
 CELL_PARAMETERS {angstrom}
  2.512428 0.000000 0.000000
 -1.256214 2.175827 0.000000
- 0.000000 0.000000 9.0
+ 0.000000 0.000000 11.0
 
 ATOMIC_POSITIONS crystal
 B 0.333333 0.666667 0.0000000
