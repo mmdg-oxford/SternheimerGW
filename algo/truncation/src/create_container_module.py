@@ -14,7 +14,7 @@ file_description = {
   },
   'trunc_coul': {
     'type': 'real(dp)',
-    'dim': 2,
+    'dim': 3,
   },
 }
 

@@ -306,9 +306,11 @@ CONTAINS
     TYPE(configuration) :: config 
     TYPE(trunc_data_container) :: data_container
     INTEGER ierr
+
+    INTEGER, PARAMETER :: unit_cell = 1, inv_unit_cell = 2
  
     !> the name of the file in which vcut is stored
-    CHARACTER(*),    PARAMETER   :: filename = 'vcut.xml'
+    CHARACTER(*),    PARAMETER   :: filename = 'trunc_data'
 
     !> the root tag used in the file
     CHARACTER(*),    PARAMETER   :: tag_root = 'TRUNC_COULOMB'
@@ -348,7 +350,7 @@ CONTAINS
 
     ! check if the file exists
     config%filename = TRIM(tmp_dir) // filename
-    INQUIRE(FILE = config%filename, EXIST = lexist)
+    INQUIRE(FILE = config%filename // '.xml', EXIST = lexist)
 
     ! find a free unit
     CALL iotk_free_unit(iunit)
@@ -359,7 +361,7 @@ CONTAINS
     DO WHILE (lexist)
 
       ! open the file
-      CALL iotk_open_read(iunit, config%filename, binary = .TRUE.)
+      CALL iotk_open_read(iunit, config%filename // '.xml', binary = .TRUE.)
 
       ! read the energy cutoff and the unit cell
       CALL iotk_scan_dat(iunit, tag_cutoff, vcut%cutoff)
@@ -411,7 +413,7 @@ CONTAINS
     CALL vcut_init(vcut, super_cell, cutoff)
 
     ! open the file
-    CALL iotk_open_write(iunit, config%filename, binary = .TRUE., root = tag_root)
+    CALL iotk_open_write(iunit, config%filename // '.xml', binary = .TRUE., root = tag_root)
     CALL data_container%open(config, ierr)
     CALL errore(__FILE__, "Error opening truncation data container", ierr) 
 
@@ -426,6 +428,12 @@ CONTAINS
     CALL iotk_write_dat(iunit, tag_ortho,      vcut%orthorombic)
     CALL iotk_write_dat(iunit, tag_shape,      SHAPE(vcut%corrected))
     CALL iotk_write_dat(iunit, tag_trunc_coul, vcut%corrected)
+    CALL allocate_data_container(data_container, SHAPE(vcut%corrected))
+    data_container%cell(:,:,unit_cell) = vcut%a
+    data_container%cell(:,:,inv_unit_cell) = vcut%b
+    data_container%cutoff = vcut%cutoff
+    data_container%trunc_coul = vcut%corrected
+    CALL data_container%write(ierr)
 
     ! close the file
     CALL iotk_close_write(iunit)
@@ -433,5 +441,19 @@ CONTAINS
     CALL errore(__FILE__, "Error closing truncation data container", ierr)
 
   END SUBROUTINE vcut_reinit
+
+  SUBROUTINE allocate_data_container(data_container, shape_tc)
+    !
+    USE trunc_data, ONLY: trunc_data_container
+    TYPE(trunc_data_container), INTENT(INOUT) :: data_container
+    INTEGER, INTENT(IN) :: shape_tc(3)
+    !
+    ALLOCATE( &
+      data_container%cell(3, 3, 2), &
+      data_container%cutoff(1), &
+      data_container%trunc_coul(shape_tc(1), shape_tc(2), shape_tc(3)), &
+    )
+    !
+  END SUBROUTINE allocate_data_container
 
 END MODULE truncation_module
