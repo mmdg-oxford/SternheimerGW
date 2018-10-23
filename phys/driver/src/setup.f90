@@ -42,7 +42,10 @@ CONTAINS
                                  consistent_dimension, write_dimension, gw_dimension
     USE gw_opening,        ONLY: gw_opening_logo, gw_opening_message
     USE gwsigma,           ONLY: ecutsco, ecutsex
+    USE io_global,         ONLY: meta_ionode
+    USE mp,                ONLY: mp_barrier
     USE mp_global,         ONLY: mp_startup
+    USE mp_world,          ONLY: world_comm
     USE sigma_grid_module, ONLY: sigma_grid
     USE timing_module,     ONLY: time_setup
     !
@@ -67,11 +70,14 @@ CONTAINS
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
     CALL open_container(output%file_data, calc%data)
-    CALL write_k_point(calc%data)
-    CALL determine_dimension(calc, dims)
-    backup_needed = .NOT.consistent_dimension(calc%data, dims)
-    IF (backup_needed) CALL backup(calc%data)
-    CALL write_dimension(calc%data, dims)
+    IF (meta_ionode) THEN
+      CALL write_k_point(calc%data)
+      CALL determine_dimension(calc, dims)
+      backup_needed = .NOT.consistent_dimension(calc%data, dims)
+      IF (backup_needed) CALL backup(calc%data)
+      CALL write_dimension(calc%data, dims)
+    END IF
+    CALL mp_barrier(world_comm)
     CALL stop_clock(time_setup)
     !
   END SUBROUTINE setup_calculation
