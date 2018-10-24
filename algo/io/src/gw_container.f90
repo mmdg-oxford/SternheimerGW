@@ -62,15 +62,21 @@ CONTAINS
 
   SUBROUTINE write_k_point(data)
     !
-    USE gw_data, ONLY: gw_data_container, var_k_point
-    USE disp,    ONLY: xk_kpoints, num_k_pts
+    USE disp,      ONLY: xk_kpoints, num_k_pts
+    USE gw_data,   ONLY: gw_data_container, var_k_point
+    USE io_global, ONLY: meta_ionode
+    USE mp,        ONLY: mp_barrier
+    USE mp_world,  ONLY: world_comm
     TYPE(gw_data_container), INTENT(INOUT) :: data
     INTEGER ierr
     !
-    ALLOCATE(data%k_point(3, num_k_pts))
-    data%k_point = xk_kpoints(1:3, 1:num_k_pts)
-    CALL data%write_variable(var_k_point, ierr)
-    CALL errore(__FILE__, "Error writing k points", ierr)
+    IF (meta_ionode) THEN
+      ALLOCATE(data%k_point(3, num_k_pts))
+      data%k_point = xk_kpoints(1:3, 1:num_k_pts)
+      CALL data%write_variable(var_k_point, ierr)
+      CALL errore(__FILE__, "Error writing k points", ierr)
+    END IF
+    CALL mp_barrier(world_comm)
     !
   END SUBROUTINE write_k_point
 
@@ -78,32 +84,37 @@ CONTAINS
     !
     USE control_gw, ONLY: do_coulomb, do_sigma_c, do_sigma_exx
     USE gw_data,    ONLY: gw_data_container, var_exch, var_corr, var_coul
+    USE io_global,  ONLY: meta_ionode, meta_ionode_id
+    USE mp,         ONLY: mp_bcast
+    USE mp_world,   ONLY: world_comm
     TYPE(gw_data_container), INTENT(INOUT) :: data
     TYPE(gw_dimension), INTENT(IN) :: dims
     !
-    consistent_dimension = .FALSE.
-    IF (.NOT.dimension_correct(data, var_coul, dims%coul)) THEN
-      IF (.NOT.do_coulomb) THEN
-        CALL errore(__FILE__, "dimension of coulomb inconsistent with datafile", var_coul)
-      ELSE
-        RETURN
+    IF (meta_ionode) THEN
+      consistent_dimension = .TRUE.
+      IF (.NOT.dimension_correct(data, var_coul, dims%coul)) THEN
+        IF (.NOT.do_coulomb) THEN
+          CALL errore(__FILE__, "dimension of coulomb inconsistent with datafile", var_coul)
+        ELSE
+          consistent_dimension = .FALSE.
+        END IF
+      END IF
+      IF (.NOT.dimension_correct(data, var_exch, dims%exch)) THEN
+        IF (.NOT.do_sigma_exx) THEN
+          CALL errore(__FILE__, "dimension of exchange inconsistent with datafile", var_exch)
+        ELSE
+          consistent_dimension = .FALSE.
+        END IF
+      END IF
+      IF (.NOT.dimension_correct(data, var_corr, dims%corr)) THEN
+        IF (.NOT.do_sigma_c) THEN
+          CALL errore(__FILE__, "dimension of correlation inconsistent with datafile", var_corr)
+        ELSE
+          consistent_dimension = .FALSE.
+        END IF
       END IF
     END IF
-    IF (.NOT.dimension_correct(data, var_exch, dims%exch)) THEN
-      IF (.NOT.do_sigma_exx) THEN
-        CALL errore(__FILE__, "dimension of exchange inconsistent with datafile", var_exch)
-      ELSE
-        RETURN
-      END IF
-    END IF
-    IF (.NOT.dimension_correct(data, var_corr, dims%corr)) THEN
-      IF (.NOT.do_sigma_c) THEN
-        CALL errore(__FILE__, "dimension of correlation inconsistent with datafile", var_corr)
-      ELSE
-        RETURN
-      END IF
-    END IF
-    consistent_dimension = .TRUE.
+    CALL mp_bcast(consistent_dimension, meta_ionode_id, world_comm)
     !
   END FUNCTION consistent_dimension
 
@@ -127,17 +138,23 @@ CONTAINS
 
   SUBROUTINE write_dimension(data, dims)
     !
-    USE gw_data, ONLY: gw_data_container, var_exch, var_corr, var_coul
+    USE gw_data,   ONLY: gw_data_container, var_exch, var_corr, var_coul
+    USE io_global, ONLY: meta_ionode
+    USE mp,        ONLY: mp_barrier
+    USE mp_world,  ONLY: world_comm
     TYPE(gw_data_container), INTENT(INOUT) :: data
     TYPE(gw_dimension), INTENT(IN) :: dims
     INTEGER ierr
     !
-    CALL data%write_dimension(var_coul, dims%coul, ierr)
-    CALL errore(__FILE__, "Error writing dimension of coulomb", ierr)
-    CALL data%write_dimension(var_exch, dims%exch, ierr)
-    CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
-    CALL data%write_dimension(var_corr, dims%corr, ierr)
-    CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
+    IF (meta_ionode) THEN
+      CALL data%write_dimension(var_coul, dims%coul, ierr)
+      CALL errore(__FILE__, "Error writing dimension of coulomb", ierr)
+      CALL data%write_dimension(var_exch, dims%exch, ierr)
+      CALL errore(__FILE__, "Error writing dimension of exchange", ierr)
+      CALL data%write_dimension(var_corr, dims%corr, ierr)
+      CALL errore(__FILE__, "Error writing dimension of correlation", ierr)
+    END IF
+    CALL mp_barrier(world_comm)
     !
   END SUBROUTINE write_dimension
 

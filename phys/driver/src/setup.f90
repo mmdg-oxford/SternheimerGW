@@ -70,14 +70,11 @@ CONTAINS
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%input%para_y_fft, calc%grid)
     CALL open_container(output%file_data, calc%data)
-    IF (meta_ionode) THEN
-      CALL write_k_point(calc%data)
-      CALL determine_dimension(calc, dims)
-      backup_needed = .NOT.consistent_dimension(calc%data, dims)
-      IF (backup_needed) CALL backup(calc%data)
-      CALL write_dimension(calc%data, dims)
-    END IF
-    CALL mp_barrier(world_comm)
+    CALL write_k_point(calc%data)
+    CALL determine_dimension(calc, dims)
+    backup_needed = .NOT.consistent_dimension(calc%data, dims)
+    IF (backup_needed) CALL backup(calc%data)
+    CALL write_dimension(calc%data, dims)
     CALL stop_clock(time_setup)
     !
   END SUBROUTINE setup_calculation
