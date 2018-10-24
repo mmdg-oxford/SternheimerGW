@@ -63,7 +63,7 @@ CONTAINS
     ! Initialize frequency grids, FFT grids for correlation
     ! and exchange operators, open relevant GW-files.
     CALL start_clock(time_setup)
-    CALL gwq_readin(calc%config_coul, calc%config_green, calc%freq, calc%vcut, calc%debug)
+    CALL gwq_readin(calc)
     CALL check_stop_init()
     CALL check_initial_status()
     CALL freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &

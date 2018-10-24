@@ -22,7 +22,7 @@
 ! http://www.gnu.org/licenses/gpl.html .
 !
 !------------------------------------------------------------------------------ 
-SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
+SUBROUTINE gwq_readin(calc)
   !----------------------------------------------------------------------------
   !
   !    This routine reads the control variables for the program GW.
@@ -46,12 +46,12 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   USE control_lr,           ONLY : lgamma, lrpa, alpha_pv
   USE Coul_cut_2D,          ONLY : do_cutoff_2D
   USE Coul_cut_2D_ph,       ONLY : cutoff_fact_qg
-  USE debug_module,         ONLY : debug_type
   USE disp,                 ONLY : nq1, nq2, nq3, iq1, iq2, iq3, xk_kpoints, num_k_pts, & 
                                    w_of_q_start, w_of_k_start, w_of_k_stop
+  USE driver,               ONLY : calculation
   USE freq_gw,              ONLY : fiu, nfs, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
                                    wsig_wind_min, wsig_wind_max, nwsigwin
-  USE freqbins_module,      ONLY : freqbins_type, no_symmetry
+  USE freqbins_module,      ONLY : no_symmetry
   USE gw_input_module,      ONLY : gw_input_type, gw_output_type, gw_input_read, gw_input_bcast
   USE gwsigma,              ONLY : nbnd_sig, ecutsex, ecutsco, corr_conv
   USE gwsymm,               ONLY : use_symm
@@ -69,7 +69,6 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   USE qpoint,               ONLY : nksq
   USE run_info,             ONLY : title
   USE save_gw,              ONLY : tmp_dir_save
-  USE select_solver_module, ONLY : select_solver_type
   USE start_k,              ONLY : reset_grid
   USE truncation_module
   USE wrappers,             ONLY : f_mkdir_safe
@@ -77,23 +76,8 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   !
   IMPLICIT NONE
   !
-  !> We store the configuration for the linear solver for W.
-  TYPE(select_solver_type), INTENT(OUT) :: config_coul
-  !
-  !> We store the configuration for the linear solver for G.
-  TYPE(select_solver_type), INTENT(OUT) :: config_green
-  !
-  !> We store the frequency for the Coulomb solver in this type.
-  TYPE(freqbins_type), INTENT(OUT) :: freq
-  !
-  !> We store the truncated Coulomb potential in this type.
-  TYPE(vcut_type),     INTENT(OUT) :: vcut
-  !
-  !> we store the debug information in this type
-  TYPE(debug_type),    INTENT(OUT) :: debug
-  !
-  !> user input from file
-  TYPE(gw_input_type) :: input
+  !> wrapper of data of GW calculation
+  TYPE(calculation), INTENT(OUT) :: calc
   !
   !> user specification for filenames
   TYPE(gw_output_type) :: output
@@ -142,45 +126,45 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
 
   ! read the user input and store it in the input type
   IF (meta_ionode) THEN
-    CALL gw_input_read(input, output)
+    CALL gw_input_read(calc%input, output)
   END IF
   ! broadcast the user input to all CPU
-  CALL gw_input_bcast(input, output)
-  title = input%title
-  prefix = input%prefix
-  tmp_dir = trimcheck(input%outdir)
-  nbnd_sig = input%num_band
-  do_imag = input%int_imag_axis
-  nk1 = input%kpt_grid(1)
-  nk2 = input%kpt_grid(2)
-  nk3 = input%kpt_grid(3)
-  nq1 = input%qpt_grid(1)
-  nq2 = input%qpt_grid(2)
-  nq3 = input%qpt_grid(3)
-  do_coulomb = input%do_epsil .OR. input%do_coul
-  do_epsil = input%do_epsil
-  tr2_gw = input%thres_coul
-  maxter_coul = input%max_iter_coul
-  priority_coul = input%priority_coul
-  lmax_gw = input%lmax_coul
-  alpha_pv = input%shift_proj
-  niter_gw = input%num_iter_coul
-  nmix_gw = input%num_mix_coul
-  use_symm = input%use_symm_coul
-  solve_direct = (input%solve_coul == 'direct')
+  CALL gw_input_bcast(calc%input, output)
+  title = calc%input%title
+  prefix = calc%input%prefix
+  tmp_dir = trimcheck(calc%input%outdir)
+  nbnd_sig = calc%input%num_band
+  do_imag = calc%input%int_imag_axis
+  nk1 = calc%input%kpt_grid(1)
+  nk2 = calc%input%kpt_grid(2)
+  nk3 = calc%input%kpt_grid(3)
+  nq1 = calc%input%qpt_grid(1)
+  nq2 = calc%input%qpt_grid(2)
+  nq3 = calc%input%qpt_grid(3)
+  do_coulomb = calc%input%do_epsil .OR. calc%input%do_coul
+  do_epsil = calc%input%do_epsil
+  tr2_gw = calc%input%thres_coul
+  maxter_coul = calc%input%max_iter_coul
+  priority_coul = calc%input%priority_coul
+  lmax_gw = calc%input%lmax_coul
+  alpha_pv = calc%input%shift_proj
+  niter_gw = calc%input%num_iter_coul
+  nmix_gw = calc%input%num_mix_coul
+  use_symm = calc%input%use_symm_coul
+  solve_direct = (calc%input%solve_coul == 'direct')
   IF (.NOT.solve_direct) THEN
-    IF (input%solve_coul /= 'iter' .AND. input%solve_coul /= 'iterative') THEN
+    IF (calc%input%solve_coul /= 'iter' .AND. calc%input%solve_coul /= 'iterative') THEN
       CALL errore(__FILE__, 'unknown solver method for coulomb', 1)
     END IF
   END IF
-  wcoulmax = input%max_freq_coul
-  nwcoul = input%num_freq_coul
-  plot_coul = input%plot_coul
+  wcoulmax = calc%input%max_freq_coul
+  nwcoul = calc%input%num_freq_coul
+  plot_coul = calc%input%plot_coul
   ! disregard case of input
-  DO i = 1, LEN_TRIM(input%model_coul)
-    input%model_coul(i:i) = lowercase(input%model_coul(i:i))
+  DO i = 1, LEN_TRIM(calc%input%model_coul)
+    calc%input%model_coul(i:i) = lowercase(calc%input%model_coul(i:i))
   END DO
-  SELECT CASE (TRIM(input%model_coul))
+  SELECT CASE (TRIM(calc%input%model_coul))
   CASE ('gn', 'pp', 'godby-needs')
     model_coul = godby_needs
   CASE ('pade')
@@ -192,34 +176,34 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   CASE ('aaa pole')
     model_coul = aaa_pole
   CASE DEFAULT
-    CALL errore(__FILE__, 'unknown screening model' // TRIM(input%model_coul), 1)
-  END SELECT ! input%model_coul
-  tr2_green = input%thres_green
-  maxter_green = input%max_iter_green
-  priority_green = input%priority_green
-  lmax_green = input%lmax_green
-  do_sigma_c = .NOT.input%do_epsil .AND. input%do_corr
-  ecutsco = input%ecut_corr
-  wsigmamin = input%min_freq_corr
-  wsigmamax = input%max_freq_corr
-  nwsigma = input%num_freq_corr
-  do_sigma_exx = .NOT.input%do_epsil .AND. input%do_exch
-  ecutsex = input%ecut_exch
-  do_sigma_matel = .NOT.input%do_epsil .AND. input%do_matrix_el
-  wsig_wind_min = input%min_freq_wind
-  wsig_wind_max = input%max_freq_wind
-  nwsigwin = input%num_freq_wind
-  truncation = input%truncation
-  do_q0_only = input%only_one_qpt
-  w_of_q_start = input%first_qpt
-  w_of_k_start = input%first_kpt
-  w_of_k_stop = input%last_kpt
-  IF (input%verbosity == 'low') THEN
+    CALL errore(__FILE__, 'unknown screening model' // TRIM(calc%input%model_coul), 1)
+  END SELECT ! calc%input%model_coul
+  tr2_green = calc%input%thres_green
+  maxter_green = calc%input%max_iter_green
+  priority_green = calc%input%priority_green
+  lmax_green = calc%input%lmax_green
+  do_sigma_c = .NOT.calc%input%do_epsil .AND. calc%input%do_corr
+  ecutsco = calc%input%ecut_corr
+  wsigmamin = calc%input%min_freq_corr
+  wsigmamax = calc%input%max_freq_corr
+  nwsigma = calc%input%num_freq_corr
+  do_sigma_exx = .NOT.calc%input%do_epsil .AND. calc%input%do_exch
+  ecutsex = calc%input%ecut_exch
+  do_sigma_matel = .NOT.calc%input%do_epsil .AND. calc%input%do_matrix_el
+  wsig_wind_min = calc%input%min_freq_wind
+  wsig_wind_max = calc%input%max_freq_wind
+  nwsigwin = calc%input%num_freq_wind
+  truncation = calc%input%truncation
+  do_q0_only = calc%input%only_one_qpt
+  w_of_q_start = calc%input%first_qpt
+  w_of_k_start = calc%input%first_kpt
+  w_of_k_stop = calc%input%last_kpt
+  IF (calc%input%verbosity == 'low') THEN
     iverbosity = 0
   ELSE
     iverbosity = 1
   END IF
-  debug = input%debug
+  calc%debug = calc%input%debug
 
   ! set Quantum ESPRESSO module variables
   lrpa        = .TRUE.
@@ -331,7 +315,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   CALL mp_bcast(nfs, meta_ionode_id, world_comm )
 
   if (nfs < 1) call errore('gwq_readin','Too few frequencies',1)
-  ALLOCATE(fiu(nfs), freq%solver(nfs))
+  ALLOCATE(fiu(nfs), calc%freq%solver(nfs))
 
   IF (meta_ionode) THEN
      IF ( TRIM(card) == 'FREQUENCIES' .OR. &
@@ -340,7 +324,7 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
         DO i = 1, nfs
            !HL Need to convert frequencies from electron volts into Rydbergs
            READ (5, *, iostat = ios) ar, ai 
-           freq%solver(i) = CMPLX(ar, ai, KIND=dp) / RYTOEV
+           calc%freq%solver(i) = CMPLX(ar, ai, KIND=dp) / RYTOEV
         END DO
      END IF
   END IF
@@ -349,29 +333,29 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   IF (do_imag) THEN
     !
     ! if we are already in the complex plane, we don't need to shift
-    freq%eta = 0.0_dp
-    eta = input%eta / RYTOEV
+    calc%freq%eta = 0.0_dp
+    eta = calc%input%eta / RYTOEV
     !
   ELSE
     !
     ! if we are on the real axis, we shift by a small amount into the
     ! complex plane for a numerically stable treatment of the poles
-    freq%eta = input%eta / RYTOEV
-    eta = input%eta / RYTOEV
+    calc%freq%eta = calc%input%eta / RYTOEV
+    eta = calc%input%eta / RYTOEV
     !
   END IF
 
   CALL mp_bcast(ios, meta_ionode_id, world_comm)
   CALL errore ('gwq_readin', 'reading FREQUENCIES card', ABS(ios) )
-  CALL mp_bcast(freq%solver, meta_ionode_id, world_comm )
-  fiu = freq%solver
+  CALL mp_bcast(calc%freq%solver, meta_ionode_id, world_comm )
+  fiu = calc%freq%solver
 
   ! use symmetry for the frequencies (only for Pade or AAA approximation)
   IF (model_coul == pade_approx .OR. model_coul == aaa_approx .OR. model_coul == aaa_pole) THEN
-    freq%freq_symm_coul = input%freq_symm_coul
+    calc%freq%freq_symm_coul = calc%input%freq_symm_coul
   ELSE
     ! symmetry not implemented for robust Pade and Godby-Needs
-    freq%freq_symm_coul = no_symmetry
+    calc%freq%freq_symm_coul = no_symmetry
   END IF
 
   num_k_pts = 0
@@ -499,8 +483,8 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
     ! a bit different then for the custom FFT type, so that we increase the
     ! prefactor to 0.3 to be on the safe side
     ecut_vcut = 0.30_dp * MAX(ecutsco, ecutsex)
-    CALL vcut_reinit(vcut, atws, ecut_vcut, tmp_dir_gw)
-    CALL vcut_info(stdout, vcut)
+    CALL vcut_reinit(calc%vcut, atws, ecut_vcut, tmp_dir_gw)
+    CALL vcut_info(stdout, calc%vcut)
     !
   END IF ! vcut truncation methods
 
@@ -510,12 +494,12 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
   !
   ! setup the linear solver
   !
-  config_coul%max_iter = maxter_coul
-  config_coul%threshold = tr2_gw
-  config_coul%bicg_lmax = lmax_gw
-  config_green%max_iter = maxter_green
-  config_green%threshold = tr2_green
-  config_green%bicg_lmax = lmax_green
+  calc%config_coul%max_iter = maxter_coul
+  calc%config_coul%threshold = tr2_gw
+  calc%config_coul%bicg_lmax = lmax_gw
+  calc%config_green%max_iter = maxter_green
+  calc%config_green%threshold = tr2_green
+  calc%config_green%bicg_lmax = lmax_green
   !
   ! setup priority for Coulomb solver
   num_priority = COUNT(priority_coul /= no_solver)
@@ -524,14 +508,14 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
     CALL errore(__FILE__, "priority for Coulomb solver not specified", 1)
   END IF
   !
-  ALLOCATE(config_coul%priority(num_priority))
+  ALLOCATE(calc%config_coul%priority(num_priority))
   ipriority = 0
   !
   DO i = 1, SIZE(priority_coul)
     !
     IF (priority_coul(i) /= no_solver) THEN
       ipriority = ipriority + 1
-      config_coul%priority(ipriority) = priority_coul(i)
+      calc%config_coul%priority(ipriority) = priority_coul(i)
     END IF
     !
   END DO ! i
@@ -543,14 +527,14 @@ SUBROUTINE gwq_readin(config_coul, config_green, freq, vcut, debug)
     CALL errore(__FILE__, "priority for Green solver not specified", 1)
   END IF
   !
-  ALLOCATE(config_green%priority(num_priority))
+  ALLOCATE(calc%config_green%priority(num_priority))
   ipriority = 0
   !
   DO i = 1, SIZE(priority_green)
     !
     IF (priority_green(i) /= no_solver) THEN
       ipriority = ipriority + 1
-      config_green%priority(ipriority) = priority_green(i)
+      calc%config_green%priority(ipriority) = priority_green(i)
     END IF
     !
   END DO ! i

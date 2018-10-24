@@ -25,6 +25,7 @@ MODULE driver
   USE debug_module,         ONLY: debug_type
   USE freqbins_module,      ONLY: freqbins_type
   USE gw_data,              ONLY: gw_data_container
+  USE gw_input_module,      ONLY: gw_input_type
   USE select_solver_module, ONLY: select_solver_type
   USE setup_nscf_module,    ONLY: sigma_config_type
   USE sigma_grid_module,    ONLY: sigma_grid_type
@@ -40,6 +41,8 @@ MODULE driver
     TYPE(freqbins_type) freq
     !> interface the larger arrays with a parallel file IO
     TYPE(gw_data_container) data
+    !> content of the input file
+    TYPE(gw_input_type) input
     !> stores the configuration of the linear solver for the screened Coulomb interaction
     TYPE(select_solver_type) config_coul
     !> stores the configuration of the linear solver for the Green's function
