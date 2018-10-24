@@ -348,6 +348,13 @@ gw_input:
     description: Verbosity of the output in the NSCF calculation. Set to either 'low'
       (default) or 'high'.
 
+  para_y_fft:
+    type: integer
+    default: 1
+    description: The FFT is parallelized over images split along the y and z axis. This factor
+      determines the split along the y axis. Note that it has to be a factor of the number of
+      images.
+
   debug:
     type: type(debug_type)
     description: Allows to activate debugging for various parts of the code. Note that the

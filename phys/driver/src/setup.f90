@@ -68,7 +68,7 @@ CONTAINS
     CALL check_initial_status()
     CALL freqbins(do_imag, wsigmamin, wsigmamax, nwsigma, wcoulmax, nwcoul, &
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
-    CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%grid)
+    CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%input%para_y_fft, calc%grid)
     CALL open_container(output%file_data, calc%data)
     IF (meta_ionode) THEN
       CALL write_k_point(calc%data)

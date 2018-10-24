@@ -62,7 +62,7 @@ SUBROUTINE gwq_readin(calc)
   USE klist,                ONLY : nks
   USE mp,                   ONLY : mp_bcast
   USE mp_global,            ONLY : nproc_pool_file, nproc_image_file
-  USE mp_images,            ONLY : my_image_id, nproc_image
+  USE mp_images,            ONLY : my_image_id, nproc_image, nimage
   USE mp_pools,             ONLY : nproc_pool
   USE mp_world,             ONLY : world_comm
   USE output_mod,           ONLY : filsigx, filsigc, filcoul
@@ -204,6 +204,8 @@ SUBROUTINE gwq_readin(calc)
     iverbosity = 1
   END IF
   calc%debug = calc%input%debug
+  CALL errore(__FILE__, "para_y_fft must be a factor of the number of images", &
+              MOD(nimage, calc%input%para_y_fft))
 
   ! set Quantum ESPRESSO module variables
   lrpa        = .TRUE.
