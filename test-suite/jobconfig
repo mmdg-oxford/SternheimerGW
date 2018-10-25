@@ -40,7 +40,8 @@ inputs_args = ('scf.in', ''), ('gw.in', '')
 
 [gw_si/]
 program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in' ,''), ('x.gw.in', ''), ('iter.gw.in', ''), ('plot.gw.in', '')
+inputs_args = ('scf.in', ''), ('gw.in' ,''), ('x.gw.in', ''), ('iter.gw.in', ''), \
+              ('plot.gw.in', ''), ('step1.gw.in', ''), ('step2.gw.in', ''), ('step3.gw.in', '')
 
 [gw_*/]
 program = SternheimerGW
