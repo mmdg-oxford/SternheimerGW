@@ -286,6 +286,9 @@ CONTAINS
 
     USE constants,           ONLY: eps12
     USE container_interface, ONLY: configuration, no_error
+    USE io_global,           ONLY: meta_ionode
+    USE mp,                  ONLY: mp_barrier
+    USE mp_world,            ONLY: world_comm
     USE trunc_data,          ONLY: trunc_data_container
 
     !> the truncated Coulomb potential
@@ -344,22 +347,28 @@ CONTAINS
         CALL data_container%close(ierr)
         RETURN
 
-      ELSE
-        ! if there is a non-zero difference abort reading
-        CALL errore(__FILE__, "Change of trunction not implemented", 1)
-
       END IF
     END IF ! read file
 
     !
     ! we should not reach this statement unless reading the file failed,
-    ! so we generate a new vcut type and write it to disk
+    ! so we delete the old file, generate a new vcut type and write it to disk
     !
+    ! delete old file
+    CALL data_container%close(ierr)
+    CALL errore(__FILE__, "Error closing truncation container", ierr)
+    IF (meta_ionode) THEN
+      OPEN(NEWUNIT=nn(1), FILE=config%filename)
+      CLOSE(UNIT=nn(1), STATUS="DELETE")
+    END IF
+    CALL mp_barrier(world_comm)
+    CALL data_container%open(config, ierr)
+    CALL errore(__FILE__, "Error reopening truncation data container", ierr)
+
+    ! generate new vcut type
     CALL vcut_init(vcut, super_cell, cutoff)
 
-    !
     ! write the vcut type to disk
-    !
     CALL allocate_data_container(data_container, SHAPE(vcut%corrected))
     data_container%cell(:,:,unit_cell) = vcut%a
     data_container%cell(:,:,inv_unit_cell) = vcut%b
