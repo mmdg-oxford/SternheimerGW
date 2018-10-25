@@ -351,6 +351,8 @@ CONTAINS
     ! check if the file exists
     config%filename = TRIM(tmp_dir) // filename
     INQUIRE(FILE = config%filename // '.xml', EXIST = lexist)
+    CALL data_container%open(config, ierr)
+    CALL errore(__FILE__, "Error opening truncation data container", ierr)
 
     ! find a free unit
     CALL iotk_free_unit(iunit)
@@ -362,10 +364,15 @@ CONTAINS
 
       ! open the file
       CALL iotk_open_read(iunit, config%filename // '.xml', binary = .TRUE.)
+      CALL data_container%read_all(ierr)
 
       ! read the energy cutoff and the unit cell
-      CALL iotk_scan_dat(iunit, tag_cutoff, vcut%cutoff)
-      CALL iotk_scan_dat(iunit, tag_cell,   vcut%a)
+      vcut%cutoff = data_container%cutoff(1)
+      vcut%a = data_container%cell(:,:,unit_cell)
+      vcut%a_omega = vcut_volume(vcut%a)
+      vcut%b = data_container%cell(:,:,inv_unit_cell)
+      vcut%b_omega = vcut_volume(vcut%b)
+      vcut%orthorombic = vcut_orthorhombic(vcut%a)
 
       ! check if this is compatible with the input
       IF (ABS(vcut%cutoff - cutoff) > eps12 .OR. &
@@ -376,12 +383,6 @@ CONTAINS
         EXIT
 
       END IF
-
-      ! read the rest of the cell information
-      CALL iotk_scan_dat(iunit, tag_inv_cell,   vcut%b)
-      CALL iotk_scan_dat(iunit, tag_volume,     vcut%a_omega)
-      CALL iotk_scan_dat(iunit, tag_inv_volume, vcut%b_omega)
-      CALL iotk_scan_dat(iunit, tag_ortho,      vcut%orthorombic)
 
       ! read the shape of the array
       CALL iotk_scan_dat(iunit, tag_shape, nn)
@@ -414,8 +415,6 @@ CONTAINS
 
     ! open the file
     CALL iotk_open_write(iunit, config%filename // '.xml', binary = .TRUE., root = tag_root)
-    CALL data_container%open(config, ierr)
-    CALL errore(__FILE__, "Error opening truncation data container", ierr) 
 
     !
     ! write the vcut type to disk
