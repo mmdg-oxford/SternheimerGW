@@ -53,6 +53,9 @@ CONTAINS
 !------------------------------------------
   SUBROUTINE vcut_init(vcut,a,cutoff)
   !------------------------------------------
+  USE mp,        ONLY: mp_sum
+  USE mp_images, ONLY: my_image_id, nimage, inter_image_comm
+  USE mp_pools,  ONLY: my_pool_id, npool, inter_pool_comm
   !
   TYPE(vcut_type),   INTENT(OUT) :: vcut
   REAL(DP),          INTENT(IN)  :: a(3,3)
@@ -88,9 +91,9 @@ CONTAINS
   !
   ! define the Fourier component of the modified Coulomb potential
   !
-  DO i1=-n1,n1
-    DO i2=-n2,n2
-      DO i3=-n3,n3
+  DO i3=-n3 + my_image_id, n3, nimage
+    DO i2=-n2 + my_pool_id, n2, npool
+      DO i1=-n1,n1
         !
         q = MATMUL(vcut%b,(/i1,i2,i3/)) 
         !
@@ -102,6 +105,8 @@ CONTAINS
       ENDDO
     ENDDO
   ENDDO
+  CALL mp_sum(vcut%corrected, inter_pool_comm)
+  CALL mp_sum(vcut%corrected, inter_image_comm)
   !
 END SUBROUTINE vcut_init
 
