@@ -285,7 +285,7 @@ CONTAINS
   SUBROUTINE vcut_reinit(vcut, super_cell, cutoff, tmp_dir)
 
     USE constants,           ONLY: eps12
-    USE container_interface, ONLY: configuration
+    USE container_interface, ONLY: configuration, no_error
     USE trunc_data,          ONLY: trunc_data_container
 
     !> the truncated Coulomb potential
@@ -309,26 +309,19 @@ CONTAINS
     !> the name of the file in which vcut is stored
     CHARACTER(*),    PARAMETER   :: filename = 'trunc_data'
 
-    !> does the file exist
-    LOGICAL lexist
-
     !> helper to read the shape of the array
     INTEGER nn(3)
 
     ! check if the file exists
     config%filename = TRIM(tmp_dir) // filename
-    INQUIRE(FILE = config%filename, EXIST = lexist)
     CALL data_container%open(config, ierr)
     CALL errore(__FILE__, "Error opening truncation data container", ierr)
 
     !
     ! read the data from the file
     !
-    DO WHILE (lexist)
-
-      ! open the file
-      CALL data_container%read_all(ierr)
-      CALL errore(__FILE__, "Error reading trunction data", ierr)
+    CALL data_container%read_all(ierr)
+    IF (ierr == no_error) THEN
 
       ! read the energy cutoff and the unit cell
       vcut%cutoff = data_container%cutoff(1)
@@ -339,22 +332,24 @@ CONTAINS
       vcut%orthorombic = vcut_orthorhombic(vcut%a)
 
       ! check if this is compatible with the input
-      IF (ABS(vcut%cutoff - cutoff) > eps12 .OR. &
-          ANY(ABS(vcut%a - super_cell) > eps12) ) THEN
+      IF (ABS(vcut%cutoff - cutoff) < eps12 .OR. &
+          ANY(ABS(vcut%a - super_cell) < eps12) ) THEN
+
+        ! allocate array for the truncated Coulomb potential
+        nn = SHAPE(data_container%trunc_coul) / 2
+        ALLOCATE(vcut%corrected(-nn(1):nn(1), -nn(2):nn(2), -nn(3):nn(3)))
+        vcut%corrected = data_container%trunc_coul
+
+        ! after the file is read we are done
+        CALL data_container%close(ierr)
+        RETURN
+
+      ELSE
         ! if there is a non-zero difference abort reading
         CALL errore(__FILE__, "Change of trunction not implemented", 1)
+
       END IF
-
-      ! allocate array for the truncated Coulomb potential
-      nn = SHAPE(data_container%trunc_coul) / 2
-      ALLOCATE(vcut%corrected(-nn(1):nn(1), -nn(2):nn(2), -nn(3):nn(3)))
-      vcut%corrected = data_container%trunc_coul
-
-      ! after the file is read we are done
-      CALL data_container%close(ierr)
-      RETURN
-
-    END DO ! read file
+    END IF ! read file
 
     !
     ! we should not reach this statement unless reading the file failed,
