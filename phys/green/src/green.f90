@@ -293,10 +293,11 @@ CONTAINS
   !> This routine writes the Hamiltonian to file in matrix format
   SUBROUTINE green_solver_debug(omega, threshold, bb, green, debug)
 
+    USE container_interface, ONLY: configuration
     USE debug_module, ONLY: debug_type, test_nan
-    USE iotk_module,  ONLY: iotk_free_unit, iotk_index, &
-                            iotk_open_write, iotk_write_dat, iotk_close_write
     USE kinds,        ONLY: dp
+    USE linear_problem, ONLY: linear_problem_container
+    USE mp,           ONLY: mp_get_comm_self
     USE mp_world,     ONLY: mpime
     USE norm_module,  ONLY: norm
     USE sleep_module, ONLY: sleep, two_min
@@ -331,8 +332,8 @@ CONTAINS
     !> counter on the number of frequencies
     INTEGER ifreq
 
-    !> unit for file I/O
-    INTEGER iunit
+    !> error flag
+    INTEGER ierr
 
     !> residual error of the linear operator
     REAL(dp) residual
@@ -340,8 +341,11 @@ CONTAINS
     !> work array for the check of the linear operator
     COMPLEX(dp), ALLOCATABLE :: work(:)
 
-    !> the full Hamiltonian
-    COMPLEX(dp), ALLOCATABLE :: hamil(:, :)
+    !> configuration to write the linear problem to file
+    TYPE(configuration) :: config
+
+    !> container for the linear problem to store on file
+    TYPE(linear_problem_container) :: container 
 
     !> complex constant of 0
     COMPLEX(dp), PARAMETER :: zero = CMPLX(0.0_dp, 0.0_dp, KIND=dp)
@@ -413,9 +417,16 @@ CONTAINS
     !
     WRITE(debug%note, *) 'extensive test necessary'
     !
+    ! open file
+    config%filename = 'green_solver' // to_string(mpime)
+    config%communicator = mp_get_comm_self()
+    CALL container%open(config, ierr)
+    CALL errore(__FILE__, "Error opening file for container", ierr)
+    !
     ! allocate work array and Hamiltonian
     ALLOCATE(work(num_g))
-    ALLOCATE(hamil(num_g, num_g))
+    ALLOCATE(container%hamil(num_g, num_g), container%omega(num_freq), &
+             container%rhs(num_g), container%green(num_g, num_freq))
 
     !
     ! generate the full Hamiltonian
@@ -427,23 +438,24 @@ CONTAINS
       work(ig) = one
       !
       ! evaluate one column of the Hamiltonian
-      CALL green_operator(zero, work, hamil(:, ig))
+      CALL green_operator(zero, work, container%hamil(:, ig))
       !
     END DO ! ig
 
     !
-    ! write everything to file
+    ! copy everything into container
     !
-    CALL iotk_free_unit(iunit)
-    CALL iotk_open_write(iunit, 'green_solver' // TRIM(iotk_index(mpime)) // '.xml', &
-                         binary = .TRUE., root = 'LINEAR_PROBLEM')
-    CALL iotk_write_dat(iunit, 'DIMENSION', num_g)
-    CALL iotk_write_dat(iunit, 'NUMBER_SHIFT', num_freq)
-    CALL iotk_write_dat(iunit, 'LIST_SHIFT', omega)
-    CALL iotk_write_dat(iunit, 'LINEAR_OPERATOR', hamil)
-    CALL iotk_write_dat(iunit, 'RIGHT_HAND_SIDE', bb)
-    CALL iotk_write_dat(iunit, 'INCORRECT_SOLUTION', green)
-    CALL iotk_close_write(iunit)
+    container%omega = omega
+    container%rhs = bb
+    container%green = green
+
+    !
+    ! write container to file
+    !
+    CALL container%write(ierr)
+    CALL errore(__FILE__, "Error writing data to file", ierr)
+    CALL container%close(ierr)
+    CALL errore(__FILE__, "Error closing file of container", ierr)
     
     !
     ! finish extensive test - stop calculation after short buffer period
@@ -456,5 +468,11 @@ CONTAINS
     CALL errore(__FILE__, "linear solver for Green's function did not pass a test", 1)
 
   END SUBROUTINE green_solver_debug
+
+  PURE FUNCTION to_string(val)
+    INTEGER, INTENT(IN) :: val
+    CHARACTER(LEN=RANGE(val) + 1) to_string
+    WRITE(to_string, '(i7.7)') val
+  END FUNCTION to_string
 
 END MODULE green_module
