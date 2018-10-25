@@ -384,25 +384,27 @@ CONTAINS
 
       END IF
 
-      ! read the shape of the array
-      CALL iotk_scan_dat(iunit, tag_shape, nn)
-
-      ! the shape values should be odd
-      IF (ANY(MOD(nn, 2) /= 1)) THEN
-
-        ! if any even exists we close the file and abort reading
-        CALL iotk_close_read(iunit)
-        EXIT
-
-      END IF
+!      ! read the shape of the array
+!      CALL iotk_scan_dat(iunit, tag_shape, nn)
+!
+!      ! the shape values should be odd
+!      IF (ANY(MOD(nn, 2) /= 1)) THEN
+!
+!        ! if any even exists we close the file and abort reading
+!        CALL iotk_close_read(iunit)
+!        EXIT
+!
+!      END IF
 
       ! allocate array for the truncated Coulomb potential
-      nn = nn / 2
+      nn = SHAPE(data_container%trunc_coul) / 2
       ALLOCATE(vcut%corrected(-nn(1):nn(1), -nn(2):nn(2), -nn(3):nn(3)))
-      CALL iotk_scan_dat(iunit, tag_trunc_coul, vcut%corrected)
+      vcut%corrected = data_container%trunc_coul
+!      CALL iotk_scan_dat(iunit, tag_trunc_coul, vcut%corrected)
 
       ! after the file is read we are done
       CALL iotk_close_read(iunit)
+      CALL data_container%close(ierr)
       RETURN
 
     END DO ! read file
