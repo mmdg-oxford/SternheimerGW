@@ -89,7 +89,7 @@ structure = {
     depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
   },
   "green": {
-    depend: ["base", "pw", "util", "data", "algo"],
+    depend: ["base", "pw", "vendor", "util", "data", "algo"],
   },
   "matrix_el": {
     depend: ["base", "pw", "lrmods", "vendor", "util", "data", "algo", "driver"],
