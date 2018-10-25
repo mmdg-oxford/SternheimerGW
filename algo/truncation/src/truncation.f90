@@ -335,7 +335,7 @@ CONTAINS
       vcut%orthorombic = vcut_orthorhombic(vcut%a)
 
       ! check if this is compatible with the input
-      IF (ABS(vcut%cutoff - cutoff) < eps12 .OR. &
+      IF (ABS(vcut%cutoff - cutoff) < eps12 .AND. &
           ANY(ABS(vcut%a - super_cell) < eps12) ) THEN
 
         ! allocate array for the truncated Coulomb potential
