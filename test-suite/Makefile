@@ -50,19 +50,19 @@ run-tests-serial : run-tests-gw-serial
 run-tests-parallel : run-tests-gw-parallel
 
 
-run-tests-gw-serial : pseudo
+run-tests-gw-serial : clean pseudo
 	env QE_USE_MPI=0 ${TESTCODE_DIR}/bin/testcode.py --verbose --category=gw_all
 
-run-tests-gw-parallel : pseudo
+run-tests-gw-parallel : clean pseudo
 	env QE_USE_MPI=1 ${TESTCODE_DIR}/bin/testcode.py --verbose --category=gw_all
 
 run-custom-test : run-custom-test-serial
 
-run-custom-test-serial : pseudo
+run-custom-test-serial : clean pseudo
 	@if test -d $(testdir); then \
 	env QE_USE_MPI=0 ${TESTCODE_DIR}/bin/testcode.py --verbose --category=$(testdir) ; fi
 
-run-custom-test-parallel : pseudo
+run-custom-test-parallel : clean pseudo
 	@if test -d $(testdir); then \
 	env QE_USE_MPI=1 ${TESTCODE_DIR}/bin/testcode.py --verbose --category=$(testdir) ; fi
 
@@ -89,3 +89,7 @@ clean:
 # Calling 'purge' means remove all reference outputs... be careful!
 purge: clean
 	@for x in `find gw_* -name "benchmark*"`; do rm -rf $$x; done
+
+.PHONY: default pseudo run-tests run-tests-serial run-tests-parallel run-custom-test \
+        run-custom-test-serial run-custom-test-parallel create-reference-gw \
+        create-custom-reference compare compare-gw compare-custom-gw clean purge
