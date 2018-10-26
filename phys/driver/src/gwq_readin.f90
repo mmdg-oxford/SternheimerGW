@@ -268,12 +268,6 @@ SUBROUTINE gwq_readin(calc)
   output_t%pp_vxc%filename        = output%file_vxc
   output_t%pp_exchange%filename   = output%file_hf
   output_t%pp_renorm%filename     = output%file_renorm
-  output_t%pp_re_corr%filename    = ''
-  output_t%pp_re_corr_iw%filename = ''
-  output_t%pp_im_corr%filename    = ''
-  output_t%pp_im_corr_iw%filename = ''
-  output_t%pp_spec%filename       = ''
-  output_t%pp_spec_iw%filename    = ''
   output_t%file_data              = output%file_data
 
 ! if corr_conv not set in input file default to the full
@@ -485,7 +479,7 @@ SUBROUTINE gwq_readin(calc)
     ! a bit different then for the custom FFT type, so that we increase the
     ! prefactor to 0.3 to be on the safe side
     ecut_vcut = 0.30_dp * MAX(ecutsco, ecutsex)
-    CALL vcut_reinit(calc%vcut, atws, ecut_vcut, tmp_dir_gw)
+    CALL vcut_reinit(calc%vcut, atws, ecut_vcut, output_t%directory)
     CALL vcut_info(stdout, calc%vcut)
     !
   END IF ! vcut truncation methods

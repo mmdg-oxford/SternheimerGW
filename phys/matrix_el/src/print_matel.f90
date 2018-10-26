@@ -29,7 +29,7 @@ use gwsigma,              only : nbnd_sig
 use io_global,            only : stdout
 use kinds,                only : DP
 use klist,                only : xk
-use pp_output_mod,        only : pp_output, pp_output_xml
+use pp_output_mod,        only : pp_output
 use wvfct,                only : nbnd, et
 
 implicit none
@@ -172,9 +172,6 @@ character(:), allocatable ::   format_string
   CALL pp_output(output%pp_vxc,      xk(:,ikq), vxc_diag * RYTOEV)
   CALL pp_output(output%pp_exchange, xk(:,ikq), sigma_ex_diag * RYTOEV)
   CALL pp_output(output%pp_renorm,   xk(:,ikq), z)
-  CALL pp_output_xml(output%pp_re_corr, ikq, xk(:,ikq), wsigma, resig_diag * RYTOEV)
-  CALL pp_output_xml(output%pp_im_corr, ikq, xk(:,ikq), wsigma, imsig_diag * RYTOEV)
-  CALL pp_output_xml(output%pp_spec,    ikq, xk(:,ikq), wsigma, a_diag / RYTOEV)
 
 END SUBROUTINE print_matel
 

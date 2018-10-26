@@ -5,12 +5,12 @@ on develop
 ----------
 
 Include new container I/O library to replace the use of the deprecated
-IOTK library.
+IOTK library. Remove all instances of IOTK from source code.
 
 Update output of GW calculation to have a higher precision and be more
 consistent.
 
-> compatible QE commit 5d111a0
+> compatible QE commit 9005a1b
 
 Version 0.15
 ------------

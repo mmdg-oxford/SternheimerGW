@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
 #
 # This file is part of the SternheimerGW code.
-# 
-# Copyright (C) 2010 - 2018 
+#
+# Copyright (C) 2010 - 2018
 # Henry Lambert, Martin Schlipf, and Feliciano Giustino
 #
 # SternheimerGW is free software: you can redistribute it and/or modify
@@ -20,32 +20,13 @@
 # http://www.gnu.org/licenses/gpl.html .
 #
 #------------------------------------------------------------------------------
+CONTAINER = linear_problem.f90
+SRC += $(CONTAINER)
+OBJ += $(CONTAINER:.f90=.o)
 
-[gw_bn/]
-program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in', ''), ('ws.gw.in', '')
+$(CONTAINER): create_container_module.py
+	python $< > $@
 
-[gw_c/]
-program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in', ''), ('aaa.gw.in', ''), \
-              ('real.gw.in', ''), ('sym.gw.in', ''), ('plot.gw.in', '')
-
-[gw_li/]
-program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in', '')
-
-[gw_licl/]
-program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in', '')
-
-[gw_si/]
-program = SternheimerGW
-inputs_args = ('scf.in', ''), ('gw.in' ,''), ('x.gw.in', ''), ('iter.gw.in', ''), \
-              ('plot.gw.in', ''), ('step1.gw.in', ''), ('step2.gw.in', ''), ('step3.gw.in', '')
-
-[gw_*/]
-program = SternheimerGW
-
-[categories]
-gw_all = gw_*?
-_default_ = gw_*?
+clean: clean_container
+clean_container:
+	rm -f $(CONTAINER)

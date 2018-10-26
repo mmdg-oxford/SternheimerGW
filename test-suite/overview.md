@@ -52,6 +52,7 @@ The following SternheimerGW features are tested in this suite
 * overcome the divergence of the Coulomb potential with spherical truncation
 * overcome the divergence of the Coulomb potential with 2d truncation
 * overcome the divergence of the Coulomb potential with Wigner-Seitz truncation
+* restart Wigner-Seitz truncation to reload/overwrite the file
 * evaluate the quasi particle eigenvalues using the Z factor
 * obtain the frequency dependent spectral function for all bands
 * restart from previously calculated W
@@ -161,6 +162,8 @@ The following SternheimerGW features are tested by this case
 * convolute G and W on the imaginary axis to obtain the self energy
 * obtain the exchange self energy
 * overcome the divergence of the Coulomb potential with spherical truncation
+* overcome the divergence of the Coulomb potential with Wigner-Seitz truncation
+* restart Wigner-Seitz truncation to reload/overwrite the file
 * evaluate the quasi particle eigenvalues using the Z factor
 * obtain the frequency dependent spectral function for all bands
 * restart from previously calculated W

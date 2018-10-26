@@ -41,6 +41,8 @@
   !
   PUBLIC :: vcut_type
   PUBLIC :: vcut_init
+  PUBLIC :: vcut_volume
+  PUBLIC :: vcut_orthorhombic
   PUBLIC :: vcut_get
   PUBLIC :: vcut_spheric_get
   PUBLIC :: vcut_destroy
@@ -51,6 +53,9 @@ CONTAINS
 !------------------------------------------
   SUBROUTINE vcut_init(vcut,a,cutoff)
   !------------------------------------------
+  USE mp,        ONLY: mp_sum
+  USE mp_images, ONLY: my_image_id, nimage, inter_image_comm
+  USE mp_pools,  ONLY: my_pool_id, npool, inter_pool_comm
   !
   TYPE(vcut_type),   INTENT(OUT) :: vcut
   REAL(DP),          INTENT(IN)  :: a(3,3)
@@ -67,17 +72,11 @@ CONTAINS
 
   vcut%a=a
   vcut%b= TPI * transpose(num_inverse(vcut%a))
-  vcut%b_omega=num_determinant(vcut%b)
-  vcut%a_omega=num_determinant(vcut%a)
+  vcut%b_omega = vcut_volume(vcut%b)
+  vcut%a_omega = vcut_volume(vcut%a)
 
   ! automatically finds whether the cell is orthorombic or not
-  vcut%orthorombic=.false.
-  !
-  mod2a=sqrt(sum(vcut%a**2,1))
-  if(abs(sum(vcut%a(:,1)*vcut%a(:,2)))/(mod2a(1)*mod2a(2))<eps6 .and. &
-     abs(sum(vcut%a(:,2)*vcut%a(:,3)))/(mod2a(2)*mod2a(3))<eps6 .and. &
-     abs(sum(vcut%a(:,3)*vcut%a(:,1)))/(mod2a(3)*mod2a(1))<eps6) vcut%orthorombic=.true.
-  !
+  vcut%orthorombic = vcut_orthorhombic(vcut%a)
 !  if (.not.vcut%orthorombic) call errore(subname,"non-orthorombic case untested",1)
 
   n1=ceiling(vcut%cutoff*sqrt(sum(vcut%a(1,:)**2))/(2.0*pi))
@@ -92,9 +91,9 @@ CONTAINS
   !
   ! define the Fourier component of the modified Coulomb potential
   !
-  DO i1=-n1,n1
-    DO i2=-n2,n2
-      DO i3=-n3,n3
+  DO i3=-n3 + my_image_id, n3, nimage
+    DO i2=-n2 + my_pool_id, n2, npool
+      DO i1=-n1,n1
         !
         q = MATMUL(vcut%b,(/i1,i2,i3/)) 
         !
@@ -106,8 +105,23 @@ CONTAINS
       ENDDO
     ENDDO
   ENDDO
+  CALL mp_sum(vcut%corrected, inter_pool_comm)
+  CALL mp_sum(vcut%corrected, inter_image_comm)
   !
 END SUBROUTINE vcut_init
+
+LOGICAL FUNCTION vcut_orthorhombic(cell) RESULT(orthorhombic)
+   !
+   REAL(dp), INTENT(IN) :: cell(3,3)
+   REAL(dp) mod2a(3)
+   !
+   mod2a = SQRT(SUM(cell**2, 1))
+   orthorhombic = &
+     ABS(SUM(cell(:,1) * cell(:,2))) / (mod2a(1) * mod2a(2)) < eps6 .AND. &
+     ABS(SUM(cell(:,2) * cell(:,3))) / (mod2a(2) * mod2a(3)) < eps6 .AND. &
+     ABS(SUM(cell(:,3) * cell(:,1))) / (mod2a(3) * mod2a(1)) < eps6
+   !
+END FUNCTION vcut_orthorhombic
 
 !------------------------------------------
   SUBROUTINE vcut_info(iun, vcut)
@@ -396,7 +410,7 @@ function num_inverse(a) result(inv)
   &            - a(modulo(i+1,3),modulo(j+2,3)) * a(modulo(i+2,3),modulo(j+1,3))
     end do
   end do
-  det = num_determinant(a)
+  det = vcut_volume(a)
   inv = transpose(tmp) / det
   if(sum((matmul(inv,a))**2-eye3) > 1d-5) then
     write(0,*) "AHIA",sum((matmul(inv,a)-eye3)**2)
@@ -407,12 +421,12 @@ function num_inverse(a) result(inv)
   end if
 end function num_inverse
 
-function num_determinant(a) result(det)
+function vcut_volume(a) result(det)
   real(dp), intent(in) :: a(3,3)
   real(dp)             :: det
   det = a(1,1)*a(2,2)*a(3,3) + a(1,2)*a(2,3)*a(3,1) + a(1,3)*a(2,1)*a(3,2) &
     - a(1,1)*a(2,3)*a(3,2) - a(1,2)*a(2,1)*a(3,3) - a(1,3)*a(2,2)*a(3,1)
-end function num_determinant
+end function vcut_volume
 
 !!! end tools from sax
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

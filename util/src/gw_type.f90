@@ -45,7 +45,6 @@ MODULE gw_type_mod
   TYPE pp_output_type
     CHARACTER(LEN=name_length) filename
     LOGICAL to_file
-    LOGICAL xml_format
     INTEGER iunit
     INTEGER num_kpoint
     INTEGER num_band
@@ -84,12 +83,6 @@ MODULE gw_type_mod
     TYPE(pp_output_type) pp_vxc
     TYPE(pp_output_type) pp_exchange
     TYPE(pp_output_type) pp_renorm
-    TYPE(pp_output_type) pp_re_corr
-    TYPE(pp_output_type) pp_re_corr_iw
-    TYPE(pp_output_type) pp_im_corr
-    TYPE(pp_output_type) pp_im_corr_iw
-    TYPE(pp_output_type) pp_spec
-    TYPE(pp_output_type) pp_spec_iw
 
     ! file for exchange and correlation part of sigma
     INTEGER unit_sigma

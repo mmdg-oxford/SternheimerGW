@@ -284,10 +284,12 @@ CONTAINS
   !! doesn't exist, we evaluate truncated potential from scratch. 
   SUBROUTINE vcut_reinit(vcut, super_cell, cutoff, tmp_dir)
 
-    USE constants,   ONLY: eps12
-    USE iotk_module, ONLY: iotk_free_unit, iotk_open_write, iotk_open_read, &
-                           iotk_write_dat, iotk_scan_dat, iotk_close_write, &
-                           iotk_close_read
+    USE constants,           ONLY: eps12
+    USE container_interface, ONLY: configuration, no_error
+    USE io_global,           ONLY: meta_ionode
+    USE mp,                  ONLY: mp_barrier
+    USE mp_world,            ONLY: world_comm
+    USE trunc_data,          ONLY: trunc_data_container
 
     !> the truncated Coulomb potential
     TYPE(vcut_type), INTENT(OUT) :: vcut
@@ -301,130 +303,97 @@ CONTAINS
     !> the directory to which the file is written
     CHARACTER(*),    INTENT(IN)  :: tmp_dir
 
+    TYPE(configuration) :: config 
+    TYPE(trunc_data_container) :: data_container
+    INTEGER ierr
+
+    INTEGER, PARAMETER :: unit_cell = 1, inv_unit_cell = 2
+ 
     !> the name of the file in which vcut is stored
-    CHARACTER(*),    PARAMETER   :: filename = 'vcut.xml'
-
-    !> the path to the file
-    CHARACTER(:),    ALLOCATABLE :: filepath
-
-    !> the root tag used in the file
-    CHARACTER(*),    PARAMETER   :: tag_root = 'TRUNC_COULOMB'
-
-    !> the tag for the unit cell
-    CHARACTER(*),    PARAMETER   :: tag_cell = 'UNIT_CELL'
-
-    !> the tag for the reciprocal unit cell
-    CHARACTER(*),    PARAMETER   :: tag_inv_cell = 'REC_UNIT_CELL'
-
-    !> the tag for the volume of the unit cell
-    CHARACTER(*),    PARAMETER   :: tag_volume = 'VOLUME'
-
-    !> the tag for the volume of the reciprocal unit cell
-    CHARACTER(*),    PARAMETER   :: tag_inv_volume = 'REC_VOLUME'
-
-    !> the tag for the shape of the array
-    CHARACTER(*),    PARAMETER   :: tag_shape = 'SHAPE_ARRAY'
-
-    !> the tag for the truncated Coulomb potential
-    CHARACTER(*),    PARAMETER   :: tag_trunc_coul = 'POTENTIAL'
-
-    !> the tag for the energy cutoff
-    CHARACTER(*),    PARAMETER   :: tag_cutoff = 'ENERGY_CUTOFF'
-
-    !> the tag for the flag indicating if the cell is orthorhombic
-    CHARACTER(*),    PARAMETER   :: tag_ortho = 'ORTHORHOMBIC'
-
-    !> does the file exist
-    LOGICAL lexist
-
-    !> unit used to access the file
-    INTEGER iunit
+    CHARACTER(*),    PARAMETER   :: filename = 'trunc_data'
 
     !> helper to read the shape of the array
     INTEGER nn(3)
 
     ! check if the file exists
-    filepath = TRIM(tmp_dir) // filename
-    INQUIRE(FILE = filepath, EXIST = lexist)
-
-    ! find a free unit
-    CALL iotk_free_unit(iunit)
+    config%filename = TRIM(tmp_dir) // filename
+    CALL data_container%open(config, ierr)
+    CALL errore(__FILE__, "Error opening truncation data container", ierr)
 
     !
     ! read the data from the file
     !
-    DO WHILE (lexist)
-
-      ! open the file
-      CALL iotk_open_read(iunit, filepath, binary = .TRUE.)
+    CALL data_container%read_all(ierr)
+    IF (ierr == no_error) THEN
 
       ! read the energy cutoff and the unit cell
-      CALL iotk_scan_dat(iunit, tag_cutoff, vcut%cutoff)
-      CALL iotk_scan_dat(iunit, tag_cell,   vcut%a)
+      vcut%cutoff = data_container%cutoff(1)
+      vcut%a = data_container%cell(:,:,unit_cell)
+      vcut%a_omega = vcut_volume(vcut%a)
+      vcut%b = data_container%cell(:,:,inv_unit_cell)
+      vcut%b_omega = vcut_volume(vcut%b)
+      vcut%orthorombic = vcut_orthorhombic(vcut%a)
 
       ! check if this is compatible with the input
-      IF (ABS(vcut%cutoff - cutoff) > eps12 .OR. &
-          ANY(ABS(vcut%a - super_cell) > eps12) ) THEN
+      IF (ABS(vcut%cutoff - cutoff) < eps12 .AND. &
+          ANY(ABS(vcut%a - super_cell) < eps12) ) THEN
 
-        ! if there is a non-zero difference close the file and abort reading
-        CALL iotk_close_read(iunit)
-        EXIT
+        ! allocate array for the truncated Coulomb potential
+        nn = SHAPE(data_container%trunc_coul) / 2
+        ALLOCATE(vcut%corrected(-nn(1):nn(1), -nn(2):nn(2), -nn(3):nn(3)))
+        vcut%corrected = data_container%trunc_coul
 
-      END IF
-
-      ! read the rest of the cell information
-      CALL iotk_scan_dat(iunit, tag_inv_cell,   vcut%b)
-      CALL iotk_scan_dat(iunit, tag_volume,     vcut%a_omega)
-      CALL iotk_scan_dat(iunit, tag_inv_volume, vcut%b_omega)
-      CALL iotk_scan_dat(iunit, tag_ortho,      vcut%orthorombic)
-
-      ! read the shape of the array
-      CALL iotk_scan_dat(iunit, tag_shape, nn)
-
-      ! the shape values should be odd
-      IF (ANY(MOD(nn, 2) /= 1)) THEN
-
-        ! if any even exists we close the file and abort reading
-        CALL iotk_close_read(iunit)
-        EXIT
+        ! after the file is read we are done
+        CALL data_container%close(ierr)
+        RETURN
 
       END IF
-
-      ! allocate array for the truncated Coulomb potential
-      nn = nn / 2
-      ALLOCATE(vcut%corrected(-nn(1):nn(1), -nn(2):nn(2), -nn(3):nn(3)))
-      CALL iotk_scan_dat(iunit, tag_trunc_coul, vcut%corrected)
-
-      ! after the file is read we are done
-      CALL iotk_close_read(iunit)
-      RETURN
-
-    END DO ! read file
+    END IF ! read file
 
     !
     ! we should not reach this statement unless reading the file failed,
-    ! so we generate a new vcut type and write it to disk
+    ! so we delete the old file, generate a new vcut type and write it to disk
     !
+    ! delete old file
+    CALL data_container%close(ierr)
+    CALL errore(__FILE__, "Error closing truncation container", ierr)
+    IF (meta_ionode) THEN
+      OPEN(NEWUNIT=nn(1), FILE=config%filename)
+      CLOSE(UNIT=nn(1), STATUS="DELETE")
+    END IF
+    CALL mp_barrier(world_comm)
+    CALL data_container%open(config, ierr)
+    CALL errore(__FILE__, "Error reopening truncation data container", ierr)
+
+    ! generate new vcut type
     CALL vcut_init(vcut, super_cell, cutoff)
 
-    ! open the file
-    CALL iotk_open_write(iunit, filepath, binary = .TRUE., root = tag_root)
-
-    !
     ! write the vcut type to disk
-    !
-    CALL iotk_write_dat(iunit, tag_cutoff,     vcut%cutoff)
-    CALL iotk_write_dat(iunit, tag_cell,       vcut%a)
-    CALL iotk_write_dat(iunit, tag_inv_cell,   vcut%b)
-    CALL iotk_write_dat(iunit, tag_volume,     vcut%a_omega)
-    CALL iotk_write_dat(iunit, tag_inv_volume, vcut%b_omega)
-    CALL iotk_write_dat(iunit, tag_ortho,      vcut%orthorombic)
-    CALL iotk_write_dat(iunit, tag_shape,      SHAPE(vcut%corrected))
-    CALL iotk_write_dat(iunit, tag_trunc_coul, vcut%corrected)
+    CALL allocate_data_container(data_container, SHAPE(vcut%corrected))
+    data_container%cell(:,:,unit_cell) = vcut%a
+    data_container%cell(:,:,inv_unit_cell) = vcut%b
+    data_container%cutoff = vcut%cutoff
+    data_container%trunc_coul = vcut%corrected
+    CALL data_container%write(ierr)
 
     ! close the file
-    CALL iotk_close_write(iunit)
+    CALL data_container%close(ierr)
+    CALL errore(__FILE__, "Error closing truncation data container", ierr)
 
   END SUBROUTINE vcut_reinit
+
+  SUBROUTINE allocate_data_container(data_container, shape_tc)
+    !
+    USE trunc_data, ONLY: trunc_data_container
+    TYPE(trunc_data_container), INTENT(INOUT) :: data_container
+    INTEGER, INTENT(IN) :: shape_tc(3)
+    !
+    ALLOCATE( &
+      data_container%cell(3, 3, 2), &
+      data_container%cutoff(1), &
+      data_container%trunc_coul(shape_tc(1), shape_tc(2), shape_tc(3)), &
+    )
+    !
+  END SUBROUTINE allocate_data_container
 
 END MODULE truncation_module

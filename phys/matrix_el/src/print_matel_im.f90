@@ -28,7 +28,7 @@ subroutine print_matel_im(ikq, vxc, sigma_band_ex, sigma_band_c, w_ryd, nwsigma)
   USE io_global,            ONLY : stdout
   USE kinds,                ONLY : DP
   USE klist,                ONLY : xk
-  USE pp_output_mod,        ONLY : pp_output, pp_output_xml
+  USE pp_output_mod,        ONLY : pp_output
   USE wvfct,                ONLY : nbnd, et
 
 implicit none
@@ -179,13 +179,6 @@ LOGICAL                   ::   single_line
      endif
   enddo
   write(stdout,*)
-
-  !
-  ! print output files according to user requirement
-  !
-  CALL pp_output_xml(output%pp_re_corr_iw, ikq, xk(:,ikq), wsigma, resig_diag * RYTOEV)
-  CALL pp_output_xml(output%pp_im_corr_iw, ikq, xk(:,ikq), wsigma, imsig_diag * RYTOEV)
-  CALL pp_output_xml(output%pp_spec_iw,    ikq, xk(:,ikq), wsigma, a_diag / RYTOEV)
 
   9005 format(8(1x,f14.7))
 RETURN

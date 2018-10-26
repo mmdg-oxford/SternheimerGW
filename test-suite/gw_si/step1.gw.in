@@ -1,0 +1,51 @@
+&gw_input
+  title = 'Initial run with WS truncation'
+
+  ! config of the scf run
+  prefix         = 'si',
+  outdir         = './tmp'
+
+  ! the grid used for the linear response
+  qpt_grid       = 1, 1, 1
+
+  ! truncation (used for both correlation and exchange)
+  truncation     = 'ws'
+
+  ! number of bands for which the GW correction is calculated
+  num_band       = 8
+
+  ! configuration of the Coulomb solver
+  thres_coul     = 1.0d-4
+
+  ! configuration of W in the convolution
+  model_coul     = 'godby-needs'
+  max_freq_coul  = 200
+  num_freq_coul  = 35
+
+  ! configuration of the Green solver
+  thres_green    = 1.0d-5
+
+  ! configuration for the correlation self energy
+  ecut_corr      = 6.0
+  min_freq_corr  = 0.0
+  max_freq_corr  = 100.0
+  num_freq_corr  = 11
+
+  ! configuration for the exchange self energy
+  ecut_exch      = 12.0
+
+/
+
+&gw_output
+/
+
+FREQUENCIES
+2
+0.0d0 0.0d0
+0.0d0 16.0d0
+/
+
+K_points
+1
+0.000000000  0.000000000   0.000000000
+/
