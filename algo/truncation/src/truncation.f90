@@ -391,7 +391,7 @@ CONTAINS
     ALLOCATE( &
       data_container%cell(3, 3, 2), &
       data_container%cutoff(1), &
-      data_container%trunc_coul(shape_tc(1), shape_tc(2), shape_tc(3)), &
+      data_container%trunc_coul(shape_tc(1), shape_tc(2), shape_tc(3)) &
     )
     !
   END SUBROUTINE allocate_data_container
