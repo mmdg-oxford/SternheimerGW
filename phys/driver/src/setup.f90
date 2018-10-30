@@ -72,7 +72,6 @@ CONTAINS
     CALL open_container(output%file_data, calc%data)
     CALL determine_dimension(calc, dims)
     backup_needed = .NOT.consistent_dimension(calc%data, dims)
-write(0,*) 'backup?', backup_needed
     IF (backup_needed) CALL backup(calc%data)
     CALL write_k_point(calc%data)
     CALL write_dimension(calc%data, dims)

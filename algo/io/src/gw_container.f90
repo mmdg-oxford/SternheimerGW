@@ -137,7 +137,6 @@ CONTAINS
     dimension_correct = .TRUE.
     CALL data%read_dimension(var, test_dim, ierr)
     CALL errore(__FILE__, "Error reading dimension", ierr)
-write(0,*) var, 'ref', ref_dim, 'test', allocated(test_dim), test_dim
     IF (.NOT.ALLOCATED(test_dim)) RETURN
     CALL data%check_dimension(ref_dim, test_dim, ierr)
     dimension_correct = (ierr == no_error)
