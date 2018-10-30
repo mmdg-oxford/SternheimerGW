@@ -356,7 +356,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: gvec(:,:)
 
     !> the resulting FFT map
-    INTEGER, ALLOCATABLE :: fft_map(:)
+    INTEGER, ALLOCATABLE, INTENT(OUT) :: fft_map(:)
 
     !> local and global index on G vectors
     INTEGER local, globl
