@@ -25,7 +25,7 @@ MODULE gw_container
   IMPLICIT NONE
 
   TYPE gw_dimension
-    INTEGER, ALLOCATABLE :: exch(:), corr(:), coul(:)
+    INTEGER, ALLOCATABLE :: kpt(:), exch(:), corr(:), coul(:)
   END TYPE gw_dimension
 
   PUBLIC
@@ -83,7 +83,7 @@ CONTAINS
   LOGICAL FUNCTION consistent_dimension(data, dims)
     !
     USE control_gw, ONLY: do_coulomb, do_sigma_c, do_sigma_exx
-    USE gw_data,    ONLY: gw_data_container, var_exch, var_corr, var_coul
+    USE gw_data,    ONLY: gw_data_container, var_exch, var_corr, var_coul, var_k_point
     USE io_global,  ONLY: meta_ionode, meta_ionode_id
     USE mp,         ONLY: mp_bcast
     USE mp_world,   ONLY: world_comm
@@ -92,6 +92,13 @@ CONTAINS
     !
     IF (meta_ionode) THEN
       consistent_dimension = .TRUE.
+      IF (.NOT.dimension_correct(data, var_k_point, dims%kpt)) THEN
+        IF (.NOT.do_sigma_exx.AND..NOT.do_sigma_c) THEN
+          CALL errore(__FILE__, "dimension of k points inconsistent with datafile", var_k_point)
+        ELSE
+          consistent_dimension = .FALSE.
+        END IF
+      END IF
       IF (.NOT.dimension_correct(data, var_coul, dims%coul)) THEN
         IF (.NOT.do_coulomb) THEN
           CALL errore(__FILE__, "dimension of coulomb inconsistent with datafile", var_coul)
@@ -130,6 +137,7 @@ CONTAINS
     dimension_correct = .TRUE.
     CALL data%read_dimension(var, test_dim, ierr)
     CALL errore(__FILE__, "Error reading dimension", ierr)
+write(0,*) var, 'ref', ref_dim, 'test', allocated(test_dim), test_dim
     IF (.NOT.ALLOCATED(test_dim)) RETURN
     CALL data%check_dimension(ref_dim, test_dim, ierr)
     dimension_correct = (ierr == no_error)

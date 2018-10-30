@@ -70,10 +70,11 @@ CONTAINS
                   wsig_wind_min, wsig_wind_max, nwsigwin, calc%freq)
     CALL sigma_grid(calc%freq, ecutsex, ecutsco, calc%input%para_y_fft, calc%grid)
     CALL open_container(output%file_data, calc%data)
-    CALL write_k_point(calc%data)
     CALL determine_dimension(calc, dims)
     backup_needed = .NOT.consistent_dimension(calc%data, dims)
+write(0,*) 'backup?', backup_needed
     IF (backup_needed) CALL backup(calc%data)
+    CALL write_k_point(calc%data)
     CALL write_dimension(calc%data, dims)
     CALL stop_clock(time_setup)
     !
@@ -83,16 +84,15 @@ CONTAINS
     !
     USE container_interface, ONLY: allocate_copy_from_to
     USE control_gw,   ONLY: do_epsil
-    USE disp,         ONLY: nqs
+    USE disp,         ONLY: nqs, num_k_pts
     USE driver,       ONLY: calculation
     USE gw_container, ONLY: gw_dimension
     TYPE(calculation), INTENT(IN) :: calc
     TYPE(gw_dimension), INTENT(OUT) :: dims
-    INTEGER num_g_exch, num_g_corr, num_k_pts, num_q_pts, num_freq_corr, num_freq_coul
+    INTEGER num_g_exch, num_g_corr, num_q_pts, num_freq_corr, num_freq_coul
     !
     num_g_exch = calc%grid%exch_fft%ngm
     num_g_corr = calc%grid%corr_fft%ngm
-    num_k_pts = SIZE(calc%data%k_point, 2)
     IF (do_epsil) THEN
       num_q_pts = num_k_pts
     ELSE
@@ -100,6 +100,7 @@ CONTAINS
     END IF
     num_freq_coul = SIZE(calc%freq%solver)
     num_freq_corr = calc%freq%num_sigma()
+    CALL allocate_copy_from_to([3, num_k_pts], dims%kpt)
     CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_freq_coul, num_q_pts], dims%coul)
     CALL allocate_copy_from_to([num_g_exch, num_g_exch, num_k_pts], dims%exch)
     CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_freq_corr, num_k_pts], dims%corr)
