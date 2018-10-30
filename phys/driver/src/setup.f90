@@ -59,6 +59,7 @@ CONTAINS
     CALL gw_opening_logo()
     CALL environment_start(code)
     CALL gw_opening_message()
+    CALL abort_invalid_parallelism()
     ! Initialize GW calculation, read ground state information.
     ! Initialize frequency grids, FFT grids for correlation
     ! and exchange operators, open relevant GW-files.
@@ -105,5 +106,17 @@ CONTAINS
     CALL allocate_copy_from_to([num_g_corr, num_g_corr, num_freq_corr, num_k_pts], dims%corr)
     !
   END SUBROUTINE determine_dimension
+
+  SUBROUTINE abort_invalid_parallelism()
+    !
+    USE mp_images, ONLY: nimage
+    USE mp_pools,  ONLY: npool
+    USE mp_world,  ONLY: nproc
+    IF (nimage * npool /= nproc) &
+      CALL errore(__FILE__, &
+        "number of processes should be split into pools and images only; run" // NEW_LINE('n') // &
+   "     mpirun -np X gw.x -npool Y -nimage Z -i gw.in > gw.out with X = Y * Z", 1)
+    !
+  END SUBROUTINE abort_invalid_parallelism
 
 END MODULE setup_module
